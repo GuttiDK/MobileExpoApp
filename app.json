@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "TelemetryApp",
+    "slug": "telemetry-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "telemetry",
+    "splash": {
+      "backgroundColor": "#0D1117"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.guttidk.telemetryapp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0D1117"
+      },
+      "package": "com.guttidk.telemetryapp"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
