@@ -86,6 +86,44 @@ Scan QR-koden med Expo Go, eller tryk `a` for Android-emulator.
 
 ---
 
+## 🔐 Autentificering
+
+### Oprettelse af bruger
+
+1. Brugeren udfylder navn, e-mail og adgangskode i appen (`AuthScreen`)
+2. Appen sender en `POST /api/auth/register` med:
+   ```json
+   { "name": "Anders", "email": "anders@mail.dk", "password": "hemmeligt" }
+   ```
+3. Backend validerer input med Zod (navn min. 2 tegn, gyldig e-mail, adgangskode min. 6 tegn)
+4. Adgangskoden hashes med **Bun's indbyggede `Bun.password.hash()`** (bcrypt)
+5. Brugeren gemmes i SQLite-tabellen `users`
+6. Backend returnerer brugerobjektet og et **JWT-token** (gyldigt i 7 dage):
+   ```json
+   { "user": { "id": 1, "name": "Anders", "email": "anders@mail.dk" }, "token": "eyJ..." }
+   ```
+7. Appen gemmer tokenet i **AsyncStorage** og sætter brugeren som logget ind
+
+### Login
+
+1. Brugeren indtaster e-mail og adgangskode
+2. Appen sender `POST /api/auth/login`
+3. Backend slår brugeren op på e-mail og verificerer adgangskoden med `Bun.password.verify()`
+4. Ved korrekte oplysninger returneres et nyt JWT-token (samme format som ved registrering)
+5. Tokenet gemmes i AsyncStorage — brugeren forbliver logget ind ved app-genstart
+
+### JWT og beskyttede endpoints
+
+- Alle endpoints under `/api/` undtagen `/api/auth/` kræver tokenet som `Authorization`-header:
+  ```
+  Authorization: Bearer eyJ...
+  ```
+- Backend verificerer tokenet med **Hono's JWT-middleware** (HS256-algoritme)
+- Brugerens ID (`sub`-feltet i tokenet) bruges til at afgøre adgang til huse og rum
+- Ved ugyldigt eller udløbet token returneres `401 Unauthorized`
+
+---
+
 ## ⚙️ Konfiguration
 
 ### `backend/.env`
