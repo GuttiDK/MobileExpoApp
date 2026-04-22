@@ -1,0 +1,17 @@
+{
+  "name": "homeapp-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:reset": "rm -f data/app.db && bun run src/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "mqtt": "^5.10.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
