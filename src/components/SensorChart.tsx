@@ -55,6 +55,9 @@ export function SensorChart({
   const dataMax = Math.max(...values);
   const yMin = minValue ?? Math.floor(dataMin - 2);
   const yMax = maxValue ?? Math.ceil(dataMax + 2);
+  // gifted-charts uses yAxisOffset to shift the baseline, and maxValue for the top
+  const yAxisOffset = yMin;
+  const adjustedMax = yMax - yMin;
 
   return (
     <View style={[styles.card, { borderColor: color + '40' }]}>
@@ -84,19 +87,14 @@ export function SensorChart({
         xAxisLabelTextStyle={{ color: '#484F58', fontSize: 9 }}
         backgroundColor={'transparent'}
         noOfSections={4}
-        maxValue={yMax}
-        minValue={yMin}
+        maxValue={adjustedMax}
+        yAxisOffset={yAxisOffset}
         hideRules={false}
         rulesColor={'#21262D'}
         rulesType="solid"
-        showStripOnHighlight
+        focusEnabled
         stripColor={color}
         stripOpacity={0.2}
-        focusEnabled
-        showTextOnFocus
-        textShiftY={-8}
-        textColor={color}
-        textFontSize={11}
         initialSpacing={10}
         endSpacing={10}
         pointerConfig={{
