@@ -1,15 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-  Alert,
-  Modal,
-  TextInput,
-  ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  RefreshControl, Alert, Modal, TextInput, ActivityIndicator, Platform,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, House } from "../lib/api";
@@ -293,6 +285,3 @@ const styles = StyleSheet.create({
   },
   modalConfirmText: { color: "#fff", fontWeight: "700" },
 });
-
-// Fix missing Platform import
-import { Platform } from "react-native";

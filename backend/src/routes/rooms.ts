@@ -81,7 +81,7 @@ roomsRouter.patch("/:id", async (c) => {
   if (updates.length === 0) return c.json({ error: "Nothing to update" }, 400);
 
   values.push(roomId);
-  db.run(`UPDATE rooms SET ${updates.join(", ")} WHERE id = ?`, ...values);
+  db.run(`UPDATE rooms SET ${updates.join(", ")} WHERE id = ?`, values);
 
   const updated = db.query("SELECT * FROM rooms WHERE id = ?").get(roomId);
   return c.json({ room: updated });
@@ -102,7 +102,7 @@ roomsRouter.delete("/:id", (c) => {
   if (!room) return c.json({ error: "Room not found or no access" }, 404);
   if (room.role === "viewer") return c.json({ error: "Viewers cannot delete rooms" }, 403);
 
-  db.run("DELETE FROM rooms WHERE id = ?", roomId);
+  db.run("DELETE FROM rooms WHERE id = ?", [roomId]);
   return c.json({ message: "Room deleted" });
 });
 

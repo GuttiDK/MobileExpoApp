@@ -54,6 +54,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ name, description }),
       }),
+    update: (id: number, data: { name?: string; description?: string }) =>
+      request<{ house: House }>(`/houses/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     join: (invite_code: string) =>
       request<{ message: string; house_id: number; house_name: string }>("/houses/join", {
         method: "POST",

@@ -18,6 +18,11 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+function makeToken(id: number, email: string) {
+  const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7;
+  return sign({ sub: id, email, exp }, JWT_SECRET, "HS256");
+}
+
 authRouter.post("/register", async (c) => {
   const body = await c.req.json();
   const parsed = registerSchema.safeParse(body);
@@ -39,10 +44,7 @@ authRouter.post("/register", async (c) => {
     .query("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id, name, email, created_at")
     .get(name, email, hash) as any;
 
-  const token = await sign(
-    { sub: result.id, email: result.email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
-    JWT_SECRET
-  );
+  const token = await makeToken(result.id, result.email);
 
   return c.json({ user: result, token }, 201);
 });
@@ -70,18 +72,10 @@ authRouter.post("/login", async (c) => {
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
-  const token = await sign(
-    { sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
-    JWT_SECRET
-  );
+  const token = await makeToken(user.id, user.email);
 
   return c.json({
     user: { id: user.id, name: user.name, email: user.email },
     token,
   });
-});
-
-authRouter.get("/me", async (c) => {
-  // This is used after verifying JWT on the protected side
-  return c.json({ message: "Use /api/me with auth header" });
 });

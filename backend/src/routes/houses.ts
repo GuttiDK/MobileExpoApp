@@ -57,7 +57,7 @@ housesRouter.post("/", async (c) => {
   // Add owner as member
   db.run(
     "INSERT INTO house_members (house_id, user_id, role) VALUES (?, ?, 'owner')",
-    house.id, userId
+    [house.id, userId]
   );
 
   return c.json({ house }, 201);
@@ -118,10 +118,45 @@ housesRouter.post("/join", async (c) => {
 
   db.run(
     "INSERT INTO house_members (house_id, user_id, role) VALUES (?, ?, 'member')",
-    house.id, userId
+    [house.id, userId]
   );
 
   return c.json({ message: "Joined successfully", house_id: house.id, house_name: house.name });
+});
+
+// Update house name/description (owner only)
+housesRouter.patch("/:id", async (c) => {
+  const userId = getUserId(c);
+  const houseId = Number(c.req.param("id"));
+
+  const member = db.query(
+    "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
+  ).get(houseId, userId) as any;
+
+  if (!member || member.role !== "owner") return c.json({ error: "Only owner can edit house" }, 403);
+
+  const body = await c.req.json();
+  const schema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "Invalid input" }, 400);
+
+  const updates: string[] = [];
+  const values: any[] = [];
+
+  if (parsed.data.name !== undefined) { updates.push("name = ?"); values.push(parsed.data.name); }
+  if (parsed.data.description !== undefined) { updates.push("description = ?"); values.push(parsed.data.description); }
+
+  if (updates.length === 0) return c.json({ error: "Nothing to update" }, 400);
+
+  values.push(houseId);
+  db.run(`UPDATE houses SET ${updates.join(", ")} WHERE id = ?`, values);
+
+  const house = db.query("SELECT * FROM houses WHERE id = ?").get(houseId);
+  return c.json({ house });
 });
 
 // Regenerate invite code (owner only)
@@ -140,7 +175,7 @@ housesRouter.post("/:id/regenerate-invite", (c) => {
     invite_code = generateInviteCode();
   }
 
-  db.run("UPDATE houses SET invite_code = ? WHERE id = ?", invite_code, houseId);
+  db.run("UPDATE houses SET invite_code = ? WHERE id = ?", [invite_code, houseId]);
 
   return c.json({ invite_code });
 });
@@ -164,7 +199,7 @@ housesRouter.patch("/:id/members/:userId", async (c) => {
 
   db.run(
     "UPDATE house_members SET role = ? WHERE house_id = ? AND user_id = ?",
-    parsed.data.role, houseId, targetUserId
+    [parsed.data.role, houseId, targetUserId]
   );
 
   return c.json({ message: "Role updated" });
@@ -182,7 +217,7 @@ housesRouter.delete("/:id/members/:userId", (c) => {
 
   if (!member || member.role !== "owner") return c.json({ error: "Only owner can remove members" }, 403);
 
-  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", houseId, targetUserId);
+  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, targetUserId]);
 
   return c.json({ message: "Member removed" });
 });
@@ -199,7 +234,7 @@ housesRouter.delete("/:id/leave", (c) => {
   if (!member) return c.json({ error: "Not a member" }, 404);
   if (member.role === "owner") return c.json({ error: "Owner cannot leave. Delete the house instead." }, 400);
 
-  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", houseId, userId);
+  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, userId]);
 
   return c.json({ message: "Left house" });
 });
@@ -215,7 +250,7 @@ housesRouter.delete("/:id", (c) => {
 
   if (!member || member.role !== "owner") return c.json({ error: "Only owner can delete house" }, 403);
 
-  db.run("DELETE FROM houses WHERE id = ?", houseId);
+  db.run("DELETE FROM houses WHERE id = ?", [houseId]);
 
   return c.json({ message: "House deleted" });
 });

@@ -1,21 +1,18 @@
 import { Database } from "bun:sqlite";
-import { join } from "path";
+import { join, dirname } from "path";
+import { mkdirSync } from "fs";
 
 const DB_PATH = process.env.DB_PATH || join(import.meta.dir, "../../data/app.db");
 
-// Ensure data directory exists
-import { mkdirSync } from "fs";
 try {
-  mkdirSync(join(import.meta.dir, "../../data"), { recursive: true });
+  mkdirSync(dirname(DB_PATH), { recursive: true });
 } catch {}
 
 export const db = new Database(DB_PATH);
 
-// Enable WAL mode for better performance
 db.run("PRAGMA journal_mode=WAL;");
 db.run("PRAGMA foreign_keys=ON;");
 
-// Schema
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +40,7 @@ db.run(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     house_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
-    role TEXT NOT NULL DEFAULT 'viewer', -- 'owner', 'member', 'viewer'
+    role TEXT NOT NULL DEFAULT 'viewer',
     joined_at TEXT DEFAULT (datetime('now')),
     UNIQUE(house_id, user_id),
     FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE,
@@ -75,11 +72,7 @@ db.run(`
   )
 `);
 
-db.run(`
-  CREATE INDEX IF NOT EXISTS idx_sensor_readings_room_id ON sensor_readings(room_id);
-`);
-db.run(`
-  CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);
-`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_room_id ON sensor_readings(room_id);`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);`);
 
-console.log("✅ Database initialized");
+console.log("Database initialized");

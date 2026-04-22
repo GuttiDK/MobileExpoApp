@@ -22,6 +22,7 @@ api.use(
   "*",
   jwt({
     secret: process.env.JWT_SECRET || "supersecretkey123",
+    alg: "HS256",
   })
 );
 
