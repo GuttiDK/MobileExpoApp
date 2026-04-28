@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  allowedDevOrigins: ['10.131.20.76'],
   serverExternalPackages: ["better-sqlite3"],
 };
 

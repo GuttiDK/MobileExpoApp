@@ -1,11 +1,17 @@
 import mqtt from 'mqtt'
-import getDb from './db'
 
 declare global {
   // eslint-disable-next-line no-var
   var __mqttClient: mqtt.MqttClient | undefined
   // eslint-disable-next-line no-var
   var __mqttInitialized: boolean | undefined
+}
+
+// Lazy-load the DB module so better-sqlite3 stays out of the instrumentation
+// hook's static module graph (Turbopack can't bundle native addons there).
+async function db() {
+  const { default: getDb } = await import('./db')
+  return getDb()
 }
 
 export function initMqtt() {
@@ -18,14 +24,9 @@ export function initMqtt() {
   const password = process.env.MQTT_PASSWORD || undefined
 
   const brokerUrl = `mqtt://${host}:${port}`
-
   console.log(`[MQTT] Connecting to ${brokerUrl}`)
 
-  const client = mqtt.connect(brokerUrl, {
-    username,
-    password,
-    reconnectPeriod: 5000,
-  })
+  const client = mqtt.connect(brokerUrl, { username, password, reconnectPeriod: 5000 })
 
   client.on('connect', () => {
     console.log('[MQTT] Connected')
@@ -48,10 +49,12 @@ export function initMqtt() {
   global.__mqttClient = client
 }
 
-function subscribeToRoomTopics(client: mqtt.MqttClient) {
+async function subscribeToRoomTopics(client: mqtt.MqttClient) {
   try {
-    const db = getDb()
-    const rooms = db.prepare('SELECT mqtt_topic FROM rooms WHERE mqtt_topic IS NOT NULL').all() as { mqtt_topic: string }[]
+    const database = await db()
+    const rooms = database
+      .prepare('SELECT mqtt_topic FROM rooms WHERE mqtt_topic IS NOT NULL')
+      .all() as { mqtt_topic: string }[]
     for (const room of rooms) {
       if (room.mqtt_topic) {
         client.subscribe(room.mqtt_topic, (err) => {
@@ -65,10 +68,12 @@ function subscribeToRoomTopics(client: mqtt.MqttClient) {
   }
 }
 
-function handleMessage(topic: string, payload: string) {
+async function handleMessage(topic: string, payload: string) {
   try {
-    const db = getDb()
-    const room = db.prepare('SELECT id FROM rooms WHERE mqtt_topic = ?').get(topic) as { id: number } | undefined
+    const database = await db()
+    const room = database
+      .prepare('SELECT id FROM rooms WHERE mqtt_topic = ?')
+      .get(topic) as { id: number } | undefined
     if (!room) return
 
     let temperature: number | null = null
@@ -85,9 +90,9 @@ function handleMessage(topic: string, payload: string) {
 
     if (temperature === null && humidity === null) return
 
-    db.prepare(
-      'INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?)'
-    ).run(room.id, temperature, humidity)
+    database
+      .prepare('INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?)')
+      .run(room.id, temperature, humidity)
 
     console.log(`[MQTT] Saved reading for room ${room.id}: temp=${temperature} hum=${humidity}`)
   } catch (err) {
