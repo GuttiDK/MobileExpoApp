@@ -5,11 +5,30 @@ import { getSessionFromRequest } from '@/lib/auth'
 
 type Params = Promise<{ id: string }>
 
+export async function GET(request: NextRequest, { params }: { params: Params }) {
+  const session = getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const { id } = await params
+  const roomId = parseInt(id, 10)
+  const db = getDb()
+
+  const room = db.prepare(`
+    SELECT r.*, hm.role AS my_role
+    FROM rooms r
+    JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
+    WHERE r.id = ?
+  `).get(session.userId, roomId)
+
+  if (!room) return NextResponse.json({ error: 'Ikke fundet' }, { status: 404 })
+  return NextResponse.json({ room })
+}
+
 const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  icon: z.string().optional(),
-  mqtt_topic: z.string().optional(),
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  icon: z.string().max(10).optional(),
+  mqtt_topic: z.string().max(256).optional(),
 })
 
 export async function PATCH(request: NextRequest, { params }: { params: Params }) {

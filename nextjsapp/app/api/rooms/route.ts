@@ -6,10 +6,10 @@ import { subscribeRoomTopic } from '@/lib/mqtt'
 
 const schema = z.object({
   house_id: z.number().int().positive(),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  icon: z.string().optional(),
-  mqtt_topic: z.string().optional(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  icon: z.string().max(10).optional(),
+  mqtt_topic: z.string().max(256).optional(),
 })
 
 export async function POST(request: NextRequest) {

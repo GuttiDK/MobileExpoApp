@@ -2,6 +2,7 @@ export interface User {
   id: number
   name: string
   email: string
+  is_admin: number
   created_at: string
 }
 
@@ -88,9 +89,10 @@ export const api = {
       apiFetch(`/api/houses/${houseId}/members/${userId}`, { method: 'DELETE' }),
   },
   rooms: {
+    get: (id: number): Promise<{ room: Room & { my_role: string } }> => apiFetch(`/api/rooms/${id}`),
     create: (data: { house_id: number; name: string; description?: string; icon?: string; mqtt_topic?: string }): Promise<{ room: Room }> =>
       apiFetch('/api/rooms', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: { name?: string; description?: string; icon?: string; mqtt_topic?: string }): Promise<{ room: Room }> =>
+    update: (id: number, data: { name?: string; description?: string; icon?: string; mqtt_topic?: string | null }): Promise<{ room: Room }> =>
       apiFetch(`/api/rooms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: number) => apiFetch(`/api/rooms/${id}`, { method: 'DELETE' }),
     history: (id: number, limit?: number): Promise<{ readings: SensorReading[] }> =>

@@ -13,6 +13,7 @@ function initSchema(db: Database.Database) {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -57,6 +58,8 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_members_user ON house_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_members_house ON house_members(house_id);
   `)
+  // Migration for existing databases
+  try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0') } catch { /* already exists */ }
 }
 
 function getDb(): Database.Database {

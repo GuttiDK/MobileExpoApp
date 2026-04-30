@@ -328,9 +328,9 @@ export default function HouseDetailPage({ params }: { params: Params }) {
                 ))}
               </div>
             </div>
-            <TextInput label="Navn" value={roomName} onChange={setRoomName} placeholder="Stue" required />
-            <TextInput label="Beskrivelse (valgfri)" value={roomDesc} onChange={setRoomDesc} placeholder="..." />
-            <TextInput label="MQTT emne (valgfri)" value={roomTopic} onChange={setRoomTopic} placeholder="home/stue/sensor" />
+            <TextInput label="Navn" value={roomName} onChange={setRoomName} placeholder="Stue" required maxLength={100} />
+            <TextInput label="Beskrivelse (valgfri)" value={roomDesc} onChange={setRoomDesc} placeholder="..." maxLength={500} />
+            <TextInput label="MQTT emne (valgfri)" value={roomTopic} onChange={setRoomTopic} placeholder="home/stue/sensor" maxLength={256} />
             {error && <ErrorMsg msg={error} />}
             <SubmitBtn label="Opret rum" loading={submitting} />
           </form>
@@ -368,8 +368,8 @@ export default function HouseDetailPage({ params }: { params: Params }) {
       {showEditHouse && (
         <Modal title="Rediger hus" onClose={() => setShowEditHouse(false)}>
           <form onSubmit={handleUpdateHouse} className="space-y-4">
-            <TextInput label="Navn" value={editName} onChange={setEditName} placeholder="Mit hjem" required />
-            <TextInput label="Beskrivelse (valgfri)" value={editDesc} onChange={setEditDesc} placeholder="..." />
+            <TextInput label="Navn" value={editName} onChange={setEditName} placeholder="Mit hjem" required maxLength={100} />
+            <TextInput label="Beskrivelse (valgfri)" value={editDesc} onChange={setEditDesc} placeholder="..." maxLength={500} />
             {error && <ErrorMsg msg={error} />}
             <SubmitBtn label="Gem" loading={submitting} />
           </form>
@@ -404,7 +404,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function TextInput({ label, value, onChange, placeholder, required }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
+function TextInput({ label, value, onChange, placeholder, required, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; maxLength?: number }) {
   return (
     <div>
       <label className="block text-sm text-slate-400 mb-1">{label}</label>
@@ -414,6 +414,7 @@ function TextInput({ label, value, onChange, placeholder, required }: { label: s
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
+        maxLength={maxLength}
         className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
       />
     </div>

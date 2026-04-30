@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/authContext'
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -42,21 +42,44 @@ export default function AuthPage() {
         </div>
 
         <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
-          <div className="flex rounded-xl bg-slate-900 p-1 mb-6">
-            <button
-              onClick={() => setMode('login')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'login' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Log ind
-            </button>
-            <button
-              onClick={() => setMode('register')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'register' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Opret konto
-            </button>
-          </div>
+          {mode !== 'forgot' && (
+            <div className="flex rounded-xl bg-slate-900 p-1 mb-6">
+              <button
+                onClick={() => { setMode('login'); setError('') }}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'login' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Log ind
+              </button>
+              <button
+                onClick={() => { setMode('register'); setError('') }}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'register' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Opret konto
+              </button>
+            </div>
+          )}
 
+          {mode === 'forgot' ? (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="text-4xl mb-3">🔑</div>
+                <h2 className="font-semibold text-slate-100 mb-1">Glemt adgangskode?</h2>
+                <p className="text-sm text-slate-400">
+                  Kontakt en administrator og bed dem om at nulstille din adgangskode via admin-panelet.
+                </p>
+              </div>
+              <div className="bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-300">
+                Din email: <span className="font-mono text-slate-100">{email || '—'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setError('') }}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold py-3 rounded-xl transition-colors"
+              >
+                ← Tilbage til log ind
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div>
@@ -67,6 +90,7 @@ export default function AuthPage() {
                   onChange={e => setName(e.target.value)}
                   placeholder="Dit navn"
                   required
+                  maxLength={100}
                   className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -80,6 +104,7 @@ export default function AuthPage() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="din@email.dk"
                 required
+                maxLength={254}
                 className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -93,6 +118,7 @@ export default function AuthPage() {
                 placeholder="••••••••"
                 required
                 minLength={6}
+                maxLength={128}
                 className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -110,7 +136,17 @@ export default function AuthPage() {
             >
               {loading ? 'Indlæser...' : mode === 'login' ? 'Log ind' : 'Opret konto'}
             </button>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => { setMode('forgot'); setError('') }}
+                className="w-full text-sm text-slate-500 hover:text-slate-300 transition-colors pt-1"
+              >
+                Glemt adgangskode?
+              </button>
+            )}
           </form>
+          )}
         </div>
       </div>
     </div>

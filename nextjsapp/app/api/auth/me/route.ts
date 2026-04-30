@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
   }
 
   const db = getDb()
-  const user = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?').get(session.userId) as
-    | { id: number; name: string; email: string; created_at: string }
+  const user = db.prepare('SELECT id, name, email, is_admin, created_at FROM users WHERE id = ?').get(session.userId) as
+    | { id: number; name: string; email: string; is_admin: number; created_at: string }
     | undefined
 
   if (!user) {

@@ -5,9 +5,9 @@ import getDb from '@/lib/db'
 import { signToken } from '@/lib/auth'
 
 const schema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(6),
+  name: z.string().min(1).max(100),
+  email: z.string().email().max(254),
+  password: z.string().min(6).max(128),
 })
 
 export async function POST(request: NextRequest) {

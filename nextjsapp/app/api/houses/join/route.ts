@@ -3,7 +3,7 @@ import { z } from 'zod'
 import getDb from '@/lib/db'
 import { getSessionFromRequest } from '@/lib/auth'
 
-const schema = z.object({ invite_code: z.string().min(1) })
+const schema = z.object({ invite_code: z.string().min(1).max(10) })
 
 export async function POST(request: NextRequest) {
   const session = getSessionFromRequest(request)

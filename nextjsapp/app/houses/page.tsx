@@ -92,9 +92,16 @@ export default function HousesPage() {
             <h1 className="text-lg font-bold text-slate-100">🏠 Mine huse</h1>
             <p className="text-sm text-slate-400">{user?.name}</p>
           </div>
-          <button onClick={handleLogout} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
-            Log ud
-          </button>
+          <div className="flex items-center gap-3">
+            {user?.is_admin ? (
+              <button onClick={() => router.push('/admin')} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                🔧 Admin
+              </button>
+            ) : null}
+            <button onClick={handleLogout} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+              Log ud
+            </button>
+          </div>
         </div>
       </header>
 
@@ -148,8 +155,8 @@ export default function HousesPage() {
       {showCreate && (
         <Modal title="Opret nyt hus" onClose={() => setShowCreate(false)}>
           <form onSubmit={handleCreate} className="space-y-4">
-            <InputField label="Navn" value={createName} onChange={setCreateName} placeholder="Mit hjem" required />
-            <InputField label="Beskrivelse (valgfri)" value={createDesc} onChange={setCreateDesc} placeholder="Beskrivelse..." />
+            <InputField label="Navn" value={createName} onChange={setCreateName} placeholder="Mit hjem" required maxLength={100} />
+            <InputField label="Beskrivelse (valgfri)" value={createDesc} onChange={setCreateDesc} placeholder="Beskrivelse..." maxLength={500} />
             {error && <ErrorMsg msg={error} />}
             <SubmitBtn label="Opret" loading={submitting} />
           </form>
@@ -160,7 +167,7 @@ export default function HousesPage() {
       {showJoin && (
         <Modal title="Tilslut med kode" onClose={() => setShowJoin(false)}>
           <form onSubmit={handleJoin} className="space-y-4">
-            <InputField label="Invitationskode" value={joinCode} onChange={setJoinCode} placeholder="ABC123" required />
+            <InputField label="Invitationskode" value={joinCode} onChange={setJoinCode} placeholder="ABC123" required maxLength={10} />
             {error && <ErrorMsg msg={error} />}
             <SubmitBtn label="Tilslut" loading={submitting} />
           </form>
@@ -184,7 +191,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function InputField({ label, value, onChange, placeholder, required }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
+function InputField({ label, value, onChange, placeholder, required, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; maxLength?: number }) {
   return (
     <div>
       <label className="block text-sm text-slate-400 mb-1">{label}</label>
@@ -194,6 +201,7 @@ function InputField({ label, value, onChange, placeholder, required }: { label: 
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
+        maxLength={maxLength}
         className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
       />
     </div>
