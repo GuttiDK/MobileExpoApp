@@ -25,7 +25,7 @@ export const mqttService = {
 
         mqttClient.on("connect", () => {
           console.log("MQTT connected");
-          subscribeToRoomTopics();
+          subscribeToRoomTopics().catch((err) => console.error("Failed to subscribe to room topics:", err));
         });
 
         mqttClient.on("message", (topic: string, payload: Buffer) => {
@@ -38,6 +38,7 @@ export const mqttService = {
 
         mqttClient.on("reconnect", () => {
           console.log("MQTT reconnecting...");
+          subscribeToRoomTopics().catch((err) => console.error("Failed to resubscribe to room topics:", err));
         });
 
         mqttClient.on("disconnect", () => {
@@ -64,15 +65,15 @@ export const mqttService = {
   },
 };
 
-function subscribeToRoomTopics() {
-  const rooms = db.query("SELECT mqtt_topic FROM rooms").all() as { mqtt_topic: string }[];
+async function subscribeToRoomTopics() {
+  const rooms = await db.query("SELECT mqtt_topic FROM rooms").all() as { mqtt_topic: string }[];
   rooms.forEach((room) => mqttService.subscribeToTopic(room.mqtt_topic));
   console.log(`Subscribed to ${rooms.length} room topics`);
 }
 
-function handleMessage(topic: string, payload: string) {
+async function handleMessage(topic: string, payload: string) {
   try {
-    const room = db.query("SELECT id FROM rooms WHERE mqtt_topic = ?").get(topic) as { id: number } | null;
+    const room = await db.query("SELECT id FROM rooms WHERE mqtt_topic = ?").get(topic) as { id: number } | null;
     if (!room) return;
 
     let temperature: number | null = null;
@@ -88,7 +89,7 @@ function handleMessage(topic: string, payload: string) {
     }
 
     if (temperature !== null || humidity !== null) {
-      db.run(
+      await db.run(
         "INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?)",
         [room.id, temperature, humidity]
       );

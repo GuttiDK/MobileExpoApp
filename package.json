@@ -8,5 +8,9 @@
   "scripts": {
     "app": "cd app && bun run start",
     "backend": "cd backend && bun run dev"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "tailwindcss": "^4.2.4"
   }
 }

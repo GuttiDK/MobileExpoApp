@@ -13,10 +13,10 @@ function generateInviteCode(): string {
 }
 
 // List all houses the user is part of
-housesRouter.get("/", (c) => {
+housesRouter.get("/", async (c) => {
   const userId = getUserId(c);
 
-  const houses = db.query(`
+  const houses = await db.query(`
     SELECT h.*, u.name as owner_name,
            hm.role as my_role,
            (SELECT COUNT(*) FROM house_members WHERE house_id = h.id) as member_count
@@ -46,16 +46,16 @@ housesRouter.post("/", async (c) => {
   let invite_code = generateInviteCode();
 
   // Ensure unique invite code
-  while (db.query("SELECT id FROM houses WHERE invite_code = ?").get(invite_code)) {
+  while (await db.query("SELECT id FROM houses WHERE invite_code = ?").get(invite_code)) {
     invite_code = generateInviteCode();
   }
 
-  const house = db
+  const house = await db
     .query("INSERT INTO houses (name, description, owner_id, invite_code) VALUES (?, ?, ?, ?) RETURNING *")
     .get(name, description || null, userId, invite_code) as any;
 
   // Add owner as member
-  db.run(
+  await db.run(
     "INSERT INTO house_members (house_id, user_id, role) VALUES (?, ?, 'owner')",
     [house.id, userId]
   );
@@ -64,30 +64,30 @@ housesRouter.post("/", async (c) => {
 });
 
 // Get a specific house
-housesRouter.get("/:id", (c) => {
+housesRouter.get("/:id", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
 
   if (!member) return c.json({ error: "Not found or no access" }, 404);
 
-  const house = db.query(`
+  const house = await db.query(`
     SELECT h.*, u.name as owner_name
     FROM houses h JOIN users u ON u.id = h.owner_id
     WHERE h.id = ?
   `).get(houseId) as any;
 
-  const members = db.query(`
+  const members = await db.query(`
     SELECT u.id, u.name, u.email, hm.role, hm.joined_at
     FROM house_members hm JOIN users u ON u.id = hm.user_id
     WHERE hm.house_id = ?
     ORDER BY hm.joined_at ASC
   `).all(houseId);
 
-  const rooms = db.query(`
+  const rooms = await db.query(`
     SELECT r.*, 
       (SELECT temperature FROM sensor_readings WHERE room_id = r.id ORDER BY recorded_at DESC LIMIT 1) as last_temperature,
       (SELECT humidity FROM sensor_readings WHERE room_id = r.id ORDER BY recorded_at DESC LIMIT 1) as last_humidity,
@@ -107,16 +107,16 @@ housesRouter.post("/join", async (c) => {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return c.json({ error: "Invalid input" }, 400);
 
-  const house = db.query("SELECT * FROM houses WHERE invite_code = ?").get(parsed.data.invite_code.toUpperCase()) as any;
+  const house = await db.query("SELECT * FROM houses WHERE invite_code = ?").get(parsed.data.invite_code.toUpperCase()) as any;
   if (!house) return c.json({ error: "Invalid invite code" }, 404);
 
-  const existing = db.query(
+  const existing = await db.query(
     "SELECT id FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(house.id, userId);
 
   if (existing) return c.json({ error: "Already a member" }, 409);
 
-  db.run(
+  await db.run(
     "INSERT INTO house_members (house_id, user_id, role) VALUES (?, ?, 'member')",
     [house.id, userId]
   );
@@ -129,7 +129,7 @@ housesRouter.patch("/:id", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
 
@@ -153,29 +153,29 @@ housesRouter.patch("/:id", async (c) => {
   if (updates.length === 0) return c.json({ error: "Nothing to update" }, 400);
 
   values.push(houseId);
-  db.run(`UPDATE houses SET ${updates.join(", ")} WHERE id = ?`, values);
+  await db.run(`UPDATE houses SET ${updates.join(", ")} WHERE id = ?`, values);
 
-  const house = db.query("SELECT * FROM houses WHERE id = ?").get(houseId);
+  const house = await db.query("SELECT * FROM houses WHERE id = ?").get(houseId);
   return c.json({ house });
 });
 
 // Regenerate invite code (owner only)
-housesRouter.post("/:id/regenerate-invite", (c) => {
+housesRouter.post("/:id/regenerate-invite", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
 
   if (!member || member.role !== "owner") return c.json({ error: "Only owner can regenerate invite" }, 403);
 
   let invite_code = generateInviteCode();
-  while (db.query("SELECT id FROM houses WHERE invite_code = ?").get(invite_code)) {
+  while (await db.query("SELECT id FROM houses WHERE invite_code = ?").get(invite_code)) {
     invite_code = generateInviteCode();
   }
 
-  db.run("UPDATE houses SET invite_code = ? WHERE id = ?", [invite_code, houseId]);
+  await db.run("UPDATE houses SET invite_code = ? WHERE id = ?", [invite_code, houseId]);
 
   return c.json({ invite_code });
 });
@@ -186,7 +186,7 @@ housesRouter.patch("/:id/members/:userId", async (c) => {
   const houseId = Number(c.req.param("id"));
   const targetUserId = Number(c.req.param("userId"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, currentUserId) as any;
 
@@ -197,7 +197,7 @@ housesRouter.patch("/:id/members/:userId", async (c) => {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return c.json({ error: "Invalid role" }, 400);
 
-  db.run(
+  await db.run(
     "UPDATE house_members SET role = ? WHERE house_id = ? AND user_id = ?",
     [parsed.data.role, houseId, targetUserId]
   );
@@ -206,51 +206,51 @@ housesRouter.patch("/:id/members/:userId", async (c) => {
 });
 
 // Remove member (owner only)
-housesRouter.delete("/:id/members/:userId", (c) => {
+housesRouter.delete("/:id/members/:userId", async (c) => {
   const currentUserId = getUserId(c);
   const houseId = Number(c.req.param("id"));
   const targetUserId = Number(c.req.param("userId"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, currentUserId) as any;
 
   if (!member || member.role !== "owner") return c.json({ error: "Only owner can remove members" }, 403);
 
-  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, targetUserId]);
+  await db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, targetUserId]);
 
   return c.json({ message: "Member removed" });
 });
 
 // Leave a house
-housesRouter.delete("/:id/leave", (c) => {
+housesRouter.delete("/:id/leave", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
 
   if (!member) return c.json({ error: "Not a member" }, 404);
   if (member.role === "owner") return c.json({ error: "Owner cannot leave. Delete the house instead." }, 400);
 
-  db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, userId]);
+  await db.run("DELETE FROM house_members WHERE house_id = ? AND user_id = ?", [houseId, userId]);
 
   return c.json({ message: "Left house" });
 });
 
 // Delete house (owner only)
-housesRouter.delete("/:id", (c) => {
+housesRouter.delete("/:id", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = db.query(
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
 
   if (!member || member.role !== "owner") return c.json({ error: "Only owner can delete house" }, 403);
 
-  db.run("DELETE FROM houses WHERE id = ?", [houseId]);
+  await db.run("DELETE FROM houses WHERE id = ?", [houseId]);
 
   return c.json({ message: "House deleted" });
 });

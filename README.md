@@ -1,44 +1,43 @@
-# HomeApp — Expo React Native + Hono Backend
+# HomeApp — Smart Home Sensor Monitoring
 
-Mobilapp til styring af smarte hjem med realtids-sensordata via MQTT. Bygget som et monorepo med en **Expo/React Native** frontend og en **Hono/Bun** backend med SQLite.
+Monorepo til styring af smarte hjem med realtids-sensordata via MQTT. Projektet indeholder tre dele: en **Expo/React Native** mobilapp, en **Hono/Bun** backend og en **Next.js 16** webapp — alle med samme funktionssæt og delt PostgreSQL-schema, containeriseret med Docker Compose.
 
 ---
 
-## 🏗️ Projektstruktur
+## Projektstruktur
 
 ```
 MobileExpoApp/
-├── app/                        # Expo React Native app (SDK 55)
+├── app/                        # Expo React Native mobilapp (SDK 55)
 │   ├── App.tsx                 # Rod-komponent med navigation
-│   ├── app.json                # Expo konfiguration
-│   ├── babel.config.js
-│   ├── tsconfig.json
-│   ├── assets/                 # Ikoner og splash screen
 │   ├── lib/
 │   │   ├── api.ts              # API-klient mod backend
-│   │   └── authContext.tsx     # Auth-state (JWT)
+│   │   └── authContext.tsx     # Auth-state (JWT + AsyncStorage)
 │   └── screens/
 │       ├── AuthScreen.tsx      # Login og registrering
 │       ├── HousesScreen.tsx    # Oversigt over brugerens huse
-│       ├── HouseDetailScreen.tsx # Rum, brugere og hus-styring
-│       └── RoomDetailScreen.tsx  # Sensorhistorik for et rum
+│       ├── HouseDetailScreen.tsx
+│       └── RoomDetailScreen.tsx
 │
-├── backend/                    # Hono REST API (Bun runtime)
-│   ├── src/
-│   │   ├── index.ts            # Server entry, JWT middleware
-│   │   ├── db/
-│   │   │   └── schema.ts       # SQLite schema og database-init
-│   │   ├── routes/
-│   │   │   ├── auth.ts         # POST /register, POST /login
-│   │   │   ├── houses.ts       # CRUD huse + medlemsstyring
-│   │   │   ├── rooms.ts        # CRUD rum + sensorhistorik
-│   │   │   └── sensors.ts      # GET latest, POST sensor-reading
-│   │   └── services/
-│   │       └── mqtt.ts         # MQTT-klient (subscribes til rum-topics)
-│   ├── .env                    # Miljøvariabler (se .env.example)
-│   ├── .env.example
-│   ├── tsconfig.json
-│   └── package.json
+├── backend/                    # Hono REST API (Bun runtime, port 3000)
+│   └── src/
+│       ├── index.ts            # Server entry, JWT middleware
+│       ├── db/schema.ts        # PostgreSQL schema og init
+│       ├── routes/             # auth, houses, rooms, sensors
+│       └── services/mqtt.ts    # MQTT-klient
+│
+├── nextjsapp/                  # Next.js 16 webapp (App Router, port 3000)
+│   ├── app/
+│   │   ├── api/                # Route Handlers (spejler backend API)
+│   │   ├── auth/               # Login/registrering side
+│   │   ├── houses/             # Hus-liste og detalje
+│   │   └── houses/[id]/rooms/  # Rum og sensorhistorik
+│   ├── lib/
+│   │   ├── db.ts               # PostgreSQL via pg
+│   │   ├── auth.ts             # JWT helpers (HttpOnly cookies)
+│   │   ├── mqtt.ts             # MQTT singleton
+│   │   └── apiClient.ts        # Client-side fetch wrapper
+│   └── instrumentation.ts      # MQTT startup via Next.js hook
 │
 ├── package.json                # Monorepo workspace root (bun workspaces)
 └── bun.lock
@@ -46,13 +45,14 @@ MobileExpoApp/
 
 ---
 
-## 🚀 Kom i gang
+## Kom i gang
 
 ### Forudsætninger
-- [Bun](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`)
-- [Expo Go](https://expo.dev/go) på din telefon (SDK 55)
-- En MQTT-broker (f.eks. Mosquitto lokalt eller Shiftr.io)
-- SQLite-mappe oprettet: `C:\sqlite\dbs\` (eller tilpas `DB_PATH` i `.env`)
+
+- [Bun](https://bun.sh) — til mobilapp og backend
+- [Node.js 18+](https://nodejs.org) — til Next.js webapp
+- [Expo Go](https://expo.dev/go) på telefon (SDK 55) — til mobilapp
+- En MQTT-broker (f.eks. [Mosquitto](https://mosquitto.org) lokalt)
 
 ### Installation
 
@@ -62,22 +62,24 @@ cd MobileExpoApp
 bun install
 ```
 
-### Kør backend
+---
+
+## Kør backend (Hono/Bun)
 
 ```bash
 cd backend
-# Første gang: kopiér .env.example til .env og udfyld værdier
-cp .env.example .env
+cp .env.example .env   # udfyld JWT_SECRET og evt. MQTT-indstillinger
 bun run dev
 ```
 
 Backend starter på `http://localhost:3000`.
 
-### Kør appen
+---
+
+## Kør mobilapp (Expo)
 
 ```bash
 cd app
-# Opret .env med din PC's lokale IP
 echo "EXPO_PUBLIC_API_URL=http://DIN-IP:3000/api" > .env
 npx expo start
 ```
@@ -86,69 +88,49 @@ Scan QR-koden med Expo Go, eller tryk `a` for Android-emulator.
 
 ---
 
-## 🔐 Autentificering
+## Kør webapp (Next.js)
 
-### Oprettelse af bruger
+```bash
+cd nextjsapp
+cp .env.local.example .env.local   # eller rediger .env.local direkte
+npm run dev
+```
 
-1. Brugeren udfylder navn, e-mail og adgangskode i appen (`AuthScreen`)
-2. Appen sender en `POST /api/auth/register` med:
-   ```json
-   { "name": "Anders", "email": "anders@mail.dk", "password": "hemmeligt" }
-   ```
-3. Backend validerer input med Zod (navn min. 2 tegn, gyldig e-mail, adgangskode min. 6 tegn)
-4. Adgangskoden hashes med **Bun's indbyggede `Bun.password.hash()`** (bcrypt)
-5. Brugeren gemmes i SQLite-tabellen `users`
-6. Backend returnerer brugerobjektet og et **JWT-token** (gyldigt i 7 dage):
-   ```json
-   { "user": { "id": 1, "name": "Anders", "email": "anders@mail.dk" }, "token": "eyJ..." }
-   ```
-7. Appen gemmer tokenet i **AsyncStorage** og sætter brugeren som logget ind
+Webapp starter på `http://localhost:3000` (eller angiv anden port med `--port`).
+
+Se `nextjsapp/README.md` for detaljer om webapp-opsætning.
+
+---
+
+## Autentificering
+
+Alle tre dele bruger JWT (HS256, 7 dages gyldighed):
+
+- **Mobilapp** — token gemmes i `AsyncStorage`, sendes som `Authorization: Bearer`-header
+- **Backend** — token valideres med Hono's JWT-middleware
+- **Webapp** — token gemmes i HttpOnly cookie, sendes automatisk med alle fetch-kald
+
+### Registrering
+
+```
+POST /api/auth/register
+{ "name": "...", "email": "...", "password": "..." }
+→ { "user": {...}, "token": "eyJ..." }
+```
 
 ### Login
 
-1. Brugeren indtaster e-mail og adgangskode
-2. Appen sender `POST /api/auth/login`
-3. Backend slår brugeren op på e-mail og verificerer adgangskoden med `Bun.password.verify()`
-4. Ved korrekte oplysninger returneres et nyt JWT-token (samme format som ved registrering)
-5. Tokenet gemmes i AsyncStorage — brugeren forbliver logget ind ved app-genstart
-
-### JWT og beskyttede endpoints
-
-- Alle endpoints under `/api/` undtagen `/api/auth/` kræver tokenet som `Authorization`-header:
-  ```
-  Authorization: Bearer eyJ...
-  ```
-- Backend verificerer tokenet med **Hono's JWT-middleware** (HS256-algoritme)
-- Brugerens ID (`sub`-feltet i tokenet) bruges til at afgøre adgang til huse og rum
-- Ved ugyldigt eller udløbet token returneres `401 Unauthorized`
+```
+POST /api/auth/login
+{ "email": "...", "password": "..." }
+→ { "user": {...}, "token": "eyJ..." }
+```
 
 ---
 
-## ⚙️ Konfiguration
+## API-oversigt
 
-### `backend/.env`
-
-| Variabel | Beskrivelse | Standard |
-|----------|-------------|---------|
-| `PORT` | Serverens port | `3000` |
-| `JWT_SECRET` | Hemmelighed til JWT-signering | — |
-| `DB_PATH` | Sti til SQLite-databasefil | `C:\sqlite\dbs\app.db` |
-| `MQTT_HOST` | IP/hostname på MQTT-broker | `localhost` |
-| `MQTT_PORT` | MQTT-brokerens port | `1883` |
-| `MQTT_USERNAME` | MQTT-brugernavn (valgfrit) | — |
-| `MQTT_PASSWORD` | MQTT-adgangskode (valgfrit) | — |
-
-### `app/.env`
-
-| Variabel | Beskrivelse |
-|----------|-------------|
-| `EXPO_PUBLIC_API_URL` | Backend URL, f.eks. `http://192.168.1.10:3000/api` |
-
----
-
-## 📡 API-oversigt
-
-Alle endpoints under `/api/` (undtagen `/api/auth/`) kræver `Authorization: Bearer <token>`.
+Alle endpoints kræver `Authorization: Bearer <token>` (eller cookie i webapp), undtagen `/api/auth/`.
 
 | Metode | Sti | Beskrivelse |
 |--------|-----|-------------|
@@ -157,9 +139,9 @@ Alle endpoints under `/api/` (undtagen `/api/auth/`) kræver `Authorization: Bea
 | GET | `/api/houses` | List egne huse |
 | POST | `/api/houses` | Opret hus |
 | GET | `/api/houses/:id` | Hus med rum og brugere |
-| PATCH | `/api/houses/:id` | Rediger hus (navn/beskrivelse) |
+| PATCH | `/api/houses/:id` | Rediger hus |
 | DELETE | `/api/houses/:id` | Slet hus (kun ejer) |
-| POST | `/api/houses/join` | Join hus med invite-kode |
+| POST | `/api/houses/join` | Join med invite-kode |
 | DELETE | `/api/houses/:id/leave` | Forlad hus |
 | POST | `/api/houses/:id/regenerate-invite` | Ny invite-kode |
 | PATCH | `/api/houses/:id/members/:userId` | Skift brugers rolle |
@@ -167,52 +149,54 @@ Alle endpoints under `/api/` (undtagen `/api/auth/`) kræver `Authorization: Bea
 | POST | `/api/rooms` | Opret rum |
 | PATCH | `/api/rooms/:id` | Rediger rum |
 | DELETE | `/api/rooms/:id` | Slet rum |
-| GET | `/api/rooms/:id/history` | Sensorhistorik for rum |
+| GET | `/api/rooms/:id/history` | Sensorhistorik |
 | GET | `/api/sensors/latest` | Seneste aflæsning per rum |
 | POST | `/api/sensors/:roomId` | Indsend sensor-aflæsning |
 
 ---
 
-## 🗄️ Database
+## Database-schema
 
-SQLite med følgende tabeller:
+PostgreSQL med følgende tabeller (samme schema i backend og nextjsapp):
 
-- **users** — brugere (id, name, email, password_hash)
-- **houses** — huse (id, name, description, owner_id, invite_code)
-- **house_members** — relationer (house_id, user_id, role: owner/member/viewer)
-- **rooms** — rum (id, house_id, name, icon, mqtt_topic)
-- **sensor_readings** — aflæsninger (room_id, temperature, humidity, recorded_at)
-
----
-
-## 📱 App-funktioner
-
-| Funktion | Beskrivelse |
-|----------|-------------|
-| **Registrering/login** | JWT-baseret auth med AsyncStorage |
-| **Huse** | Opret, join med kode, se alle dine huse |
-| **Hus-styring** | Rediger navn, generer ny invite-kode, slet hus |
-| **Brugerstyring** | Skift rolle (medlem/gæst), fjern fra hus |
-| **Rum** | Opret rum med MQTT-topic og ikon, slet rum |
-| **Sensordata** | Realtids temperatur og luftfugtighed via MQTT |
-| **Historik** | Graf over sensoraflæsninger |
+| Tabel | Felter |
+|-------|--------|
+| `users` | id, name, email, password_hash, created_at |
+| `houses` | id, name, description, owner_id, invite_code, created_at |
+| `house_members` | id, house_id, user_id, role (owner/member/viewer), joined_at |
+| `rooms` | id, house_id, name, description, icon, mqtt_topic, created_at |
+| `sensor_readings` | id, room_id, temperature, humidity, recorded_at |
 
 ---
 
-## 📦 Teknologier
+## MQTT sensordata
+
+Fysiske sensorer publicerer til et MQTT-topic (konfigureret per rum):
+
+```
+Payload (JSON):   {"temperature": 22.5, "humidity": 65}
+Payload (tekst):  22.5
+```
+
+Backend/webapp abonnerer automatisk på alle rum-topics ved opstart og gemmer aflæsninger i databasen.
+
+---
+
+## Teknologier
 
 | Teknologi | Formål |
 |-----------|--------|
-| **Expo SDK 55** | React Native managed workflow |
-| **React Native 0.83** | UI framework |
-| **React Navigation v7** | Stack-navigation |
-| **TypeScript** | Typesikkerhed |
-| **Hono** | Letvægts HTTP-framework til Bun |
-| **Bun** | Runtime, package manager og SQLite-driver |
-| **bun:sqlite** | Indbygget SQLite (ingen ekstern driver) |
-| **mqtt.js** | MQTT-klient til sensordata |
-| **Zod** | Input-validering i backend |
-| **JWT** | Stateless authentication |
+| Expo SDK 55 | React Native mobilapp |
+| React Navigation v7 | Stack-navigation i mobilapp |
+| Hono | Letvægts HTTP-framework (backend) |
+| Bun | Runtime and package manager (backend) |
+| Next.js 16 | Fullstack webapp (App Router + Turbopack) |
+| PostgreSQL | Persistent relational database for backend and webapp |
+| mqtt.js | MQTT-klient i backend og webapp |
+| Tailwind CSS v4 | Styling i webapp |
+| Zod | Input-validering |
+| JWT (HS256) | Stateless authentication |
+| TypeScript | Typesikkerhed i hele projektet |
 
 ---
 
