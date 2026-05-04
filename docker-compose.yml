@@ -1,19 +1,17 @@
 services:
   postgres:
     image: postgres:15-alpine
+    network_mode: host
     environment:
       - POSTGRES_USER=homeapp
       - POSTGRES_PASSWORD=homeapp123
       - POSTGRES_DB=homeapp
-    ports:
-      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
   mqtt:
     image: eclipse-mosquitto:2.0
-    ports:
-      - "1883:1883"
+    network_mode: host
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data
@@ -23,8 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    network_mode: host
     volumes:
       - ./backend:/usr/src/app
       - backend-data:/usr/src/app/data
@@ -39,18 +36,17 @@ services:
     build:
       context: ./nextjsapp
       dockerfile: Dockerfile
-    ports:
-      - "3001:3000"
+    network_mode: host
     volumes:
       - ./nextjsapp:/usr/src/app
       - nextjs-node-modules:/usr/src/app/node_modules
       - nextjs-build:/usr/src/app/.next
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=3001
       - NEXT_TELEMETRY_DISABLED=1
-      - DATABASE_URL=postgres://homeapp:homeapp123@postgres:5432/homeapp
-      - MQTT_HOST=mqtt
+      - DATABASE_URL=postgres://homeapp:homeapp123@localhost:5432/homeapp
+      - MQTT_HOST=localhost
       - MQTT_PORT=1883
     depends_on:
       - backend
@@ -60,11 +56,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
-    ports:
-      - "19006:19006"
-      - "19000:19000"
-      - "19001:19001"
-      - "19002:19002"
+    network_mode: host
     volumes:
       - ./app:/usr/src/app
       - expo-node-modules:/usr/src/app/node_modules
