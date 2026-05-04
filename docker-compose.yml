@@ -5,6 +5,8 @@ services:
       - POSTGRES_USER=homeapp
       - POSTGRES_PASSWORD=homeapp123
       - POSTGRES_DB=homeapp
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
