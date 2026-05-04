@@ -3,10 +3,10 @@ import getDb from '@/lib/db'
 import { getAdminSession } from '@/lib/adminCheck'
 
 export async function GET(request: NextRequest) {
-  if (!getAdminSession(request)) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
+  if (!(await getAdminSession(request))) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
   const db = getDb()
-  const rooms = db.prepare(`
+  const rooms = await db.prepare(`
     SELECT r.id, r.name, r.description, r.icon, r.mqtt_topic, r.house_id, r.created_at,
            h.name AS house_name
     FROM rooms r

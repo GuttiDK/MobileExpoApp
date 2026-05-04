@@ -8,8 +8,8 @@ function getUserId(c: any): number {
   return c.get("jwtPayload").sub;
 }
 
-function hasHouseAccess(userId: number, houseId: number): string | null {
-  const member = db.query(
+async function hasHouseAccess(userId: number, houseId: number): Promise<string | null> {
+  const member = await db.query(
     "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
   ).get(houseId, userId) as any;
   return member ? member.role : null;
@@ -33,11 +33,11 @@ roomsRouter.post("/", async (c) => {
 
   const { house_id, name, description, icon, mqtt_topic } = parsed.data;
 
-  const role = hasHouseAccess(userId, house_id);
+  const role = await hasHouseAccess(userId, house_id);
   if (!role) return c.json({ error: "No access to this house" }, 403);
   if (role === "viewer") return c.json({ error: "Viewers cannot create rooms" }, 403);
 
-  const room = db
+  const room = await db
     .query("INSERT INTO rooms (house_id, name, description, icon, mqtt_topic) VALUES (?, ?, ?, ?, ?) RETURNING *")
     .get(house_id, name, description || null, icon || "thermometer", mqtt_topic) as any;
 
@@ -49,7 +49,7 @@ roomsRouter.patch("/:id", async (c) => {
   const userId = getUserId(c);
   const roomId = Number(c.req.param("id"));
 
-  const room = db.query(`
+  const room = await db.query(`
     SELECT r.*, hm.role
     FROM rooms r
     JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
@@ -81,18 +81,18 @@ roomsRouter.patch("/:id", async (c) => {
   if (updates.length === 0) return c.json({ error: "Nothing to update" }, 400);
 
   values.push(roomId);
-  db.run(`UPDATE rooms SET ${updates.join(", ")} WHERE id = ?`, values);
+  await db.run(`UPDATE rooms SET ${updates.join(", ")} WHERE id = ?`, values);
 
-  const updated = db.query("SELECT * FROM rooms WHERE id = ?").get(roomId);
+  const updated = await db.query("SELECT * FROM rooms WHERE id = ?").get(roomId);
   return c.json({ room: updated });
 });
 
 // Delete a room
-roomsRouter.delete("/:id", (c) => {
+roomsRouter.delete("/:id", async (c) => {
   const userId = getUserId(c);
   const roomId = Number(c.req.param("id"));
 
-  const room = db.query(`
+  const room = await db.query(`
     SELECT r.*, hm.role
     FROM rooms r
     JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
@@ -102,17 +102,17 @@ roomsRouter.delete("/:id", (c) => {
   if (!room) return c.json({ error: "Room not found or no access" }, 404);
   if (room.role === "viewer") return c.json({ error: "Viewers cannot delete rooms" }, 403);
 
-  db.run("DELETE FROM rooms WHERE id = ?", [roomId]);
+  await db.run("DELETE FROM rooms WHERE id = ?", [roomId]);
   return c.json({ message: "Room deleted" });
 });
 
 // Get sensor history for a room
-roomsRouter.get("/:id/history", (c) => {
+roomsRouter.get("/:id/history", async (c) => {
   const userId = getUserId(c);
   const roomId = Number(c.req.param("id"));
   const limit = Math.min(Number(c.req.query("limit") || 100), 500);
 
-  const room = db.query(`
+  const room = await db.query(`
     SELECT r.*, hm.role
     FROM rooms r
     JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
@@ -121,7 +121,7 @@ roomsRouter.get("/:id/history", (c) => {
 
   if (!room) return c.json({ error: "Room not found or no access" }, 404);
 
-  const readings = db.query(`
+  const readings = await db.query(`
     SELECT temperature, humidity, recorded_at
     FROM sensor_readings
     WHERE room_id = ?

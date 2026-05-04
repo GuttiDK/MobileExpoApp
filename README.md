@@ -1,6 +1,6 @@
 # HomeApp — Smart Home Sensor Monitoring
 
-Monorepo til styring af smarte hjem med realtids-sensordata via MQTT. Projektet indeholder tre dele: en **Expo/React Native** mobilapp, en **Hono/Bun** backend og en **Next.js 16** webapp — alle med samme funktionssæt og delt SQLite-database-schema.
+Monorepo til styring af smarte hjem med realtids-sensordata via MQTT. Projektet indeholder tre dele: en **Expo/React Native** mobilapp, en **Hono/Bun** backend og en **Next.js 16** webapp — alle med samme funktionssæt og delt PostgreSQL-schema, containeriseret med Docker Compose.
 
 ---
 
@@ -22,7 +22,7 @@ MobileExpoApp/
 ├── backend/                    # Hono REST API (Bun runtime, port 3000)
 │   └── src/
 │       ├── index.ts            # Server entry, JWT middleware
-│       ├── db/schema.ts        # SQLite schema og init
+│       ├── db/schema.ts        # PostgreSQL schema og init
 │       ├── routes/             # auth, houses, rooms, sensors
 │       └── services/mqtt.ts    # MQTT-klient
 │
@@ -33,7 +33,7 @@ MobileExpoApp/
 │   │   ├── houses/             # Hus-liste og detalje
 │   │   └── houses/[id]/rooms/  # Rum og sensorhistorik
 │   ├── lib/
-│   │   ├── db.ts               # SQLite via better-sqlite3
+│   │   ├── db.ts               # PostgreSQL via pg
 │   │   ├── auth.ts             # JWT helpers (HttpOnly cookies)
 │   │   ├── mqtt.ts             # MQTT singleton
 │   │   └── apiClient.ts        # Client-side fetch wrapper
@@ -157,7 +157,7 @@ Alle endpoints kræver `Authorization: Bearer <token>` (eller cookie i webapp), 
 
 ## Database-schema
 
-SQLite med følgende tabeller (samme schema i backend og nextjsapp):
+PostgreSQL med følgende tabeller (samme schema i backend og nextjsapp):
 
 | Tabel | Felter |
 |-------|--------|
@@ -189,9 +189,9 @@ Backend/webapp abonnerer automatisk på alle rum-topics ved opstart og gemmer af
 | Expo SDK 55 | React Native mobilapp |
 | React Navigation v7 | Stack-navigation i mobilapp |
 | Hono | Letvægts HTTP-framework (backend) |
-| Bun | Runtime, package manager, SQLite-driver (backend) |
+| Bun | Runtime and package manager (backend) |
 | Next.js 16 | Fullstack webapp (App Router + Turbopack) |
-| better-sqlite3 | SQLite-driver til Next.js |
+| PostgreSQL | Persistent relational database for backend and webapp |
 | mqtt.js | MQTT-klient i backend og webapp |
 | Tailwind CSS v4 | Styling i webapp |
 | Zod | Input-validering |

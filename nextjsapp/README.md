@@ -12,7 +12,7 @@ Next.js 16 webapp til styring af smarte hjem med realtids-sensordata via MQTT. S
 | React | 19.x | UI |
 | TypeScript | 5.x | Typesikkerhed |
 | Tailwind CSS | 4.x | Styling (mørkt tema) |
-| better-sqlite3 | 12.x | SQLite-database (server-side) |
+| pg | 8.x | PostgreSQL database (server-side) |
 | mqtt.js | — | MQTT-klient til sensordata |
 | jsonwebtoken | — | JWT-signering og -validering |
 | bcryptjs | — | Adgangskode-hashing |
@@ -59,7 +59,7 @@ nextjsapp/
 │           ├── latest/route.ts     # GET
 │           └── [roomId]/route.ts   # POST
 ├── lib/
-│   ├── db.ts                       # SQLite-opsætning og schema
+│   ├── db.ts                       # PostgreSQL-opsætning og schema
 │   ├── auth.ts                     # JWT helpers (sign, verify, session)
 │   ├── mqtt.ts                     # MQTT singleton med lazy DB-import
 │   ├── apiClient.ts                # Client-side fetch wrapper + typer
@@ -85,7 +85,7 @@ npm install
 Rediger `.env.local` (oprettes automatisk ved første klon, ellers opret den):
 
 ```env
-DATABASE_PATH=./homeapp.db
+DATABASE_URL=postgres://homeapp:homeapp123@postgres:5432/homeapp
 JWT_SECRET=skift-mig-i-produktion
 
 MQTT_HOST=localhost
@@ -118,14 +118,14 @@ npm run start
 | Indstilling | Formål |
 |-------------|--------|
 | `turbopack.root` | Sætter Turbopack workspace-rod til `nextjsapp/` (løser CSS-module resolution i monorepo) |
-| `serverExternalPackages` | Ekskluderer `better-sqlite3` fra bundling (native C++ addon) |
+| `serverExternalPackages` | Ikke påkrævet for PostgreSQL/pg-basen |
 | `allowedDevOrigins` | Tillader adgang fra andre enheder på netværket i dev-mode |
 
 ### `.env.local`
 
 | Variabel | Beskrivelse | Standard |
 |----------|-------------|---------|
-| `DATABASE_PATH` | Sti til SQLite-fil | `./homeapp.db` |
+| `DATABASE_URL` | Postgres connection string | `postgres://homeapp:homeapp123@postgres:5432/homeapp` |
 | `JWT_SECRET` | Hemmelighed til JWT-signering | — |
 | `MQTT_HOST` | MQTT-brokerens hostname | `localhost` |
 | `MQTT_PORT` | MQTT-brokerens port | `1883` |
@@ -153,14 +153,14 @@ MQTT-klienten initialiseres ved server-opstart via `instrumentation.ts` og `lib/
 - Parser JSON- (`{"temperature": 22.5, "humidity": 65}`) og tekstpayloads (enkelt tal)
 - Gemmer aflæsninger i `sensor_readings`-tabellen
 
-`lib/db.ts` importeres **dynamisk** inde i event-handlers for at undgå at `better-sqlite3` trækkes ind i Turbopacks statiske module-graph for instrumentation-hooken.
+`lib/db.ts` importeres **dynamisk** inde i event-handlers for at undgå at Postgres-poolen trækkes ind i Turbopacks statiske module-graph for instrumentation-hooken.
 
 ---
 
 ## Kendte begrænsninger
 
 - **Ingen realtids-push** — sensordata opdateres ved manuel genindlæsning (↺-knap)
-- **SQLite** er ikke egnet til høj samskrivning fra mange brugere samtidig
+- **PostgreSQL** er den anbefalede database til flere samtidige brugere og containeriserede miljøer
 - **MQTT** kræver en løbende Node.js-server — fungerer ikke på serverless-platforme (Vercel)
 
 ---

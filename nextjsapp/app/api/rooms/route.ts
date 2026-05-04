@@ -23,15 +23,15 @@ export async function POST(request: NextRequest) {
   const { house_id, name, description, icon, mqtt_topic } = parsed.data
   const db = getDb()
 
-  const member = db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(house_id, session.userId) as { role: string } | undefined
+  const member = await db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(house_id, session.userId) as { role: string } | undefined
   if (!member || member.role === 'viewer') return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
-  const result = db.prepare(
-    'INSERT INTO rooms (house_id, name, description, icon, mqtt_topic) VALUES (?, ?, ?, ?, ?)'
-  ).run(house_id, name, description ?? null, icon ?? '🏠', mqtt_topic ?? null)
+  const result = await db.prepare(
+    'INSERT INTO rooms (house_id, name, description, icon, mqtt_topic) VALUES (?, ?, ?, ?, ?) RETURNING id'
+  ).get(house_id, name, description ?? null, icon ?? '🏠', mqtt_topic ?? null)
 
   if (mqtt_topic) subscribeRoomTopic(mqtt_topic)
 
-  const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(result.lastInsertRowid)
+  const room = await db.prepare('SELECT * FROM rooms WHERE id = ?').get(result.id)
   return NextResponse.json({ room }, { status: 201 })
 }

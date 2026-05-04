@@ -7,8 +7,8 @@ declare global {
   var __mqttInitialized: boolean | undefined
 }
 
-// Lazy-load the DB module so better-sqlite3 stays out of the instrumentation
-// hook's static module graph (Turbopack can't bundle native addons there).
+// Lazy-load the DB module so the Postgres pool initialization stays out of the
+// instrumentation hook's static module graph.
 async function db() {
   const { default: getDb } = await import('./db')
   return getDb()
@@ -30,11 +30,11 @@ export function initMqtt() {
 
   client.on('connect', () => {
     console.log('[MQTT] Connected')
-    subscribeToRoomTopics(client)
+    subscribeToRoomTopics(client).catch((err) => console.error('[MQTT] Subscribe error:', err))
   })
 
   client.on('message', (topic, message) => {
-    handleMessage(topic, message.toString())
+    handleMessage(topic, message.toString()).catch((err) => console.error('[MQTT] Handle message error:', err))
   })
 
   client.on('error', (err) => {
@@ -43,7 +43,7 @@ export function initMqtt() {
 
   client.on('reconnect', () => {
     console.log('[MQTT] Reconnecting...')
-    subscribeToRoomTopics(client)
+    subscribeToRoomTopics(client).catch((err) => console.error('[MQTT] Resubscribe error:', err))
   })
 
   global.__mqttClient = client
@@ -52,7 +52,7 @@ export function initMqtt() {
 async function subscribeToRoomTopics(client: mqtt.MqttClient) {
   try {
     const database = await db()
-    const rooms = database
+    const rooms = await database
       .prepare('SELECT mqtt_topic FROM rooms WHERE mqtt_topic IS NOT NULL')
       .all() as { mqtt_topic: string }[]
     for (const room of rooms) {
@@ -71,7 +71,7 @@ async function subscribeToRoomTopics(client: mqtt.MqttClient) {
 async function handleMessage(topic: string, payload: string) {
   try {
     const database = await db()
-    const room = database
+    const room = await database
       .prepare('SELECT id FROM rooms WHERE mqtt_topic = ?')
       .get(topic) as { id: number } | undefined
     if (!room) return
@@ -90,7 +90,7 @@ async function handleMessage(topic: string, payload: string) {
 
     if (temperature === null && humidity === null) return
 
-    database
+    await database
       .prepare('INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?)')
       .run(room.id, temperature, humidity)
 

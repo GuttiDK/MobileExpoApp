@@ -33,14 +33,14 @@ authRouter.post("/register", async (c) => {
 
   const { name, email, password } = parsed.data;
 
-  const existing = db.query("SELECT id FROM users WHERE email = ?").get(email);
+  const existing = await db.query("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) {
     return c.json({ error: "Email already in use" }, 409);
   }
 
   const hash = await Bun.password.hash(password);
 
-  const result = db
+  const result = await db
     .query("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id, name, email, created_at")
     .get(name, email, hash) as any;
 
@@ -59,7 +59,7 @@ authRouter.post("/login", async (c) => {
 
   const { email, password } = parsed.data;
 
-  const user = db
+  const user = await db
     .query("SELECT id, name, email, password_hash FROM users WHERE email = ?")
     .get(email) as any;
 

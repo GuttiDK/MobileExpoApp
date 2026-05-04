@@ -1,78 +1,113 @@
-import { Database } from "bun:sqlite";
-import { join, dirname } from "path";
-import { mkdirSync } from "fs";
+import { Pool } from "pg";
 
-const DB_PATH = process.env.DB_PATH || join(import.meta.dir, "../../data/app.db");
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgres://homeapp:homeapp123@localhost:5432/homeapp";
 
-try {
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-} catch {}
+const pool = new Pool({ connectionString: DATABASE_URL });
 
-export const db = new Database(DB_PATH);
+function toPostgresQuery(sql: string) {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
+}
 
-db.run("PRAGMA journal_mode=WAL;");
-db.run("PRAGMA foreign_keys=ON;");
+function normalizeParams(params: unknown[] | unknown) {
+  if (params === undefined || params === null) return [];
+  if (Array.isArray(params) && params.length === 1 && Array.isArray(params[0])) {
+    return params[0] as unknown[];
+  }
+  if (Array.isArray(params)) return params;
+  return [params];
+}
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  )
-`);
+class PreparedQuery {
+  constructor(private sql: string) {}
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS houses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT,
-    owner_id INTEGER NOT NULL,
-    invite_code TEXT UNIQUE NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-  )
-`);
+  async get(...params: unknown[]) {
+    const result = await pool.query(toPostgresQuery(this.sql), normalizeParams(params));
+    return result.rows[0];
+  }
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS house_members (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    house_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    role TEXT NOT NULL DEFAULT 'viewer',
-    joined_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(house_id, user_id),
-    FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )
-`);
+  async all(...params: unknown[]) {
+    const result = await pool.query(toPostgresQuery(this.sql), normalizeParams(params));
+    return result.rows;
+  }
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS rooms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    house_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    icon TEXT DEFAULT 'thermometer',
-    mqtt_topic TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
-  )
-`);
+  async run(...params: unknown[]) {
+    return await pool.query(toPostgresQuery(this.sql), normalizeParams(params));
+  }
+}
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS sensor_readings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id INTEGER NOT NULL,
-    temperature REAL,
-    humidity REAL,
-    recorded_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
-  )
-`);
+export const db = {
+  query: (sql: string) => new PreparedQuery(sql),
+  prepare: (sql: string) => new PreparedQuery(sql),
+  async run(sql: string, params?: unknown[] | unknown) {
+    return await pool.query(toPostgresQuery(sql), normalizeParams(params));
+  },
+  async exec(sql: string) {
+    return await pool.query(sql);
+  },
+};
 
-db.run(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_room_id ON sensor_readings(room_id);`);
-db.run(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);`);
+async function initSchema() {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS houses (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      invite_code TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS house_members (
+      id SERIAL PRIMARY KEY,
+      house_id INTEGER NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'viewer',
+      joined_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(house_id, user_id)
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS rooms (
+      id SERIAL PRIMARY KEY,
+      house_id INTEGER NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT DEFAULT 'thermometer',
+      mqtt_topic TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS sensor_readings (
+      id SERIAL PRIMARY KEY,
+      room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      temperature DOUBLE PRECISION,
+      humidity DOUBLE PRECISION,
+      recorded_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_room_id ON sensor_readings(room_id);`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);`);
+}
+
+await initSchema();
 
 console.log("Database initialized");

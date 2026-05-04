@@ -11,7 +11,7 @@ const schema = z.object({
 })
 
 export async function PATCH(request: NextRequest, { params }: { params: Params }) {
-  if (!getAdminSession(request)) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
+  if (!(await getAdminSession(request))) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
   const { id } = await params
   const userId = parseInt(id, 10)
@@ -21,11 +21,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   if (!parsed.success) return NextResponse.json({ error: 'Adgangskode skal være mindst 6 tegn' }, { status: 400 })
 
   const db = getDb()
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId)
+  const user = await db.prepare('SELECT id FROM users WHERE id = ?').get(userId)
   if (!user) return NextResponse.json({ error: 'Bruger ikke fundet' }, { status: 404 })
 
   const hash = await bcrypt.hash(parsed.data.password, 10)
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId)
+  await db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId)
 
   return NextResponse.json({ ok: true })
 }

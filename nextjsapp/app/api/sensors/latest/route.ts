@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
 
   const db = getDb()
-  const readings = db.prepare(`
+  const readings = await db.prepare(`
     SELECT sr.room_id, r.name AS room_name, h.name AS house_name,
            sr.temperature, sr.humidity, sr.recorded_at
     FROM sensor_readings sr

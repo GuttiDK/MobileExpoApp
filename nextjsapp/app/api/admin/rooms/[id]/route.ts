@@ -13,7 +13,7 @@ const schema = z.object({
 })
 
 export async function PATCH(request: NextRequest, { params }: { params: Params }) {
-  if (!getAdminSession(request)) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
+  if (!(await getAdminSession(request))) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
   const { id } = await params
   const roomId = parseInt(id, 10)
@@ -23,16 +23,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   if (!parsed.success) return NextResponse.json({ error: 'Ugyldig input' }, { status: 400 })
 
   const db = getDb()
-  const room = db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId)
+  const room = await db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId)
   if (!room) return NextResponse.json({ error: 'Rum ikke fundet' }, { status: 404 })
 
   const { name, description, icon, mqtt_topic } = parsed.data
-  if (name) db.prepare('UPDATE rooms SET name = ? WHERE id = ?').run(name, roomId)
-  if (description !== undefined) db.prepare('UPDATE rooms SET description = ? WHERE id = ?').run(description, roomId)
-  if (icon) db.prepare('UPDATE rooms SET icon = ? WHERE id = ?').run(icon, roomId)
-  if (mqtt_topic !== undefined) db.prepare('UPDATE rooms SET mqtt_topic = ? WHERE id = ?').run(mqtt_topic, roomId)
+  if (name) await db.prepare('UPDATE rooms SET name = ? WHERE id = ?').run(name, roomId)
+  if (description !== undefined) await db.prepare('UPDATE rooms SET description = ? WHERE id = ?').run(description, roomId)
+  if (icon) await db.prepare('UPDATE rooms SET icon = ? WHERE id = ?').run(icon, roomId)
+  if (mqtt_topic !== undefined) await db.prepare('UPDATE rooms SET mqtt_topic = ? WHERE id = ?').run(mqtt_topic, roomId)
 
-  const updated = db.prepare(`
+  const updated = await db.prepare(`
     SELECT r.*, h.name AS house_name FROM rooms r JOIN houses h ON h.id = r.house_id WHERE r.id = ?
   `).get(roomId)
   return NextResponse.json({ room: updated })

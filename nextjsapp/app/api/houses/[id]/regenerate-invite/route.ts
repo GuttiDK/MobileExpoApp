@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   const houseId = parseInt(id, 10)
   const db = getDb()
 
-  const member = db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
+  const member = await db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
   if (!member || member.role !== 'owner') return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
   let invite_code: string
@@ -25,8 +25,8 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     invite_code = randomInviteCode()
     attempts++
     if (attempts > 20) return NextResponse.json({ error: 'Fejl' }, { status: 500 })
-  } while (db.prepare('SELECT id FROM houses WHERE invite_code = ? AND id != ?').get(invite_code, houseId))
+  } while (await db.prepare('SELECT id FROM houses WHERE invite_code = ? AND id != ?').get(invite_code, houseId))
 
-  db.prepare('UPDATE houses SET invite_code = ? WHERE id = ?').run(invite_code, houseId)
+  await db.prepare('UPDATE houses SET invite_code = ? WHERE id = ?').run(invite_code, houseId)
   return NextResponse.json({ invite_code })
 }

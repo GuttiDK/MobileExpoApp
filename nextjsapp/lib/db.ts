@@ -1,56 +1,103 @@
-import Database from 'better-sqlite3'
-import path from 'path'
+import { Pool } from 'pg'
 
 declare global {
   // eslint-disable-next-line no-var
-  var __db: Database.Database | undefined
+  var __db: {
+    pool: Pool
+    ready: Promise<void>
+    prepare: (sql: string) => PreparedQuery
+    query: (sql: string) => PreparedQuery
+    exec: (sql: string) => Promise<void>
+  } | undefined
 }
 
-function initSchema(db: Database.Database) {
-  db.exec(`
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgres://homeapp:homeapp123@localhost:5432/homeapp'
+
+const pool = global.__db?.pool ?? new Pool({ connectionString: DATABASE_URL })
+let ready = global.__db?.ready
+
+function toPostgresQuery(sql: string) {
+  let index = 0
+  return sql.replace(/\?/g, () => `$${++index}`)
+}
+
+function normalizeParams(params: unknown[] | unknown) {
+  if (params === undefined || params === null) return []
+  if (Array.isArray(params) && params.length === 1 && Array.isArray(params[0])) {
+    return params[0] as unknown[]
+  }
+  if (Array.isArray(params)) return params
+  return [params]
+}
+
+class PreparedQuery {
+  constructor(private sql: string) {}
+
+  async get(...params: unknown[]) {
+    await ready
+    const result = await pool.query(toPostgresQuery(this.sql), normalizeParams(params))
+    return result.rows[0]
+  }
+
+  async all(...params: unknown[]) {
+    await ready
+    const result = await pool.query(toPostgresQuery(this.sql), normalizeParams(params))
+    return result.rows
+  }
+
+  async run(...params: unknown[]) {
+    await ready
+    await pool.query(toPostgresQuery(this.sql), normalizeParams(params))
+  }
+}
+
+async function initSchema() {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      is_admin INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      is_admin BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS houses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
       owner_id INTEGER NOT NULL REFERENCES users(id),
       invite_code TEXT UNIQUE NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TIMESTAMPTZ DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS house_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       house_id INTEGER NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       role TEXT NOT NULL DEFAULT 'member',
-      joined_at TEXT DEFAULT (datetime('now')),
+      joined_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(house_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS rooms (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       house_id INTEGER NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
       icon TEXT DEFAULT '🏠',
       mqtt_topic TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TIMESTAMPTZ DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS sensor_readings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-      temperature REAL,
-      humidity REAL,
-      recorded_at TEXT DEFAULT (datetime('now'))
+      temperature DOUBLE PRECISION,
+      humidity DOUBLE PRECISION,
+      recorded_at TIMESTAMPTZ DEFAULT now()
     );
 
     CREATE INDEX IF NOT EXISTS idx_sensor_room ON sensor_readings(room_id);
@@ -58,23 +105,21 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_members_user ON house_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_members_house ON house_members(house_id);
   `)
-  // Migration for existing databases
-  try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0') } catch { /* already exists */ }
 }
 
-function getDb(): Database.Database {
-  if (!global.__db) {
-    const dbPath = process.env.DATABASE_PATH
-      ? path.resolve(process.env.DATABASE_PATH)
-      : path.join(process.cwd(), 'homeapp.db')
+ready = ready ?? initSchema()
 
-    const db = new Database(dbPath)
-    db.pragma('journal_mode = WAL')
-    db.pragma('foreign_keys = ON')
-    initSchema(db)
-    global.__db = db
-  }
-  return global.__db
+global.__db = global.__db ?? {
+  pool,
+  ready,
+  prepare: (sql: string) => new PreparedQuery(sql),
+  query: (sql: string) => new PreparedQuery(sql),
+  exec: async (sql: string) => {
+    await ready
+    await pool.query(sql)
+  },
 }
 
-export default getDb
+export default function getDb() {
+  return global.__db!
+}

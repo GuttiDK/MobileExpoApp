@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
 
   const db = getDb()
-  const houses = db.prepare(`
+  const houses = await db.prepare(`
     SELECT h.id, h.name, h.description, h.owner_id, h.invite_code, h.created_at,
            hm.role AS my_role,
            u.name AS owner_name,
@@ -48,18 +48,18 @@ export async function POST(request: NextRequest) {
     invite_code = randomInviteCode()
     attempts++
     if (attempts > 20) return NextResponse.json({ error: 'Kunne ikke generere invitationskode' }, { status: 500 })
-  } while (db.prepare('SELECT id FROM houses WHERE invite_code = ?').get(invite_code))
+  } while (await db.prepare('SELECT id FROM houses WHERE invite_code = ?').get(invite_code))
 
-  const result = db.prepare(
-    'INSERT INTO houses (name, description, owner_id, invite_code) VALUES (?, ?, ?, ?)'
-  ).run(name, description ?? null, session.userId, invite_code)
+  const result = await db.prepare(
+    'INSERT INTO houses (name, description, owner_id, invite_code) VALUES (?, ?, ?, ?) RETURNING id'
+  ).get(name, description ?? null, session.userId, invite_code)
 
-  const houseId = result.lastInsertRowid
-  db.prepare(
+  const houseId = result.id
+  await db.prepare(
     "INSERT INTO house_members (house_id, user_id, role) VALUES (?, ?, 'owner')"
   ).run(houseId, session.userId)
 
-  const house = db.prepare(`
+  const house = await db.prepare(`
     SELECT h.*, hm.role AS my_role, u.name AS owner_name,
            (SELECT COUNT(*) FROM house_members WHERE house_id = h.id) AS member_count
     FROM houses h

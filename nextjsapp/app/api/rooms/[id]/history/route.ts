@@ -15,13 +15,13 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 
   const db = getDb()
 
-  const room = db.prepare(
+  const room = await db.prepare(
     'SELECT r.id FROM rooms r JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ? WHERE r.id = ?'
   ).get(session.userId, roomId)
 
   if (!room) return NextResponse.json({ error: 'Ikke fundet' }, { status: 404 })
 
-  const readings = db.prepare(
+  const readings = await db.prepare(
     'SELECT id, temperature, humidity, recorded_at FROM sensor_readings WHERE room_id = ? ORDER BY recorded_at DESC LIMIT ?'
   ).all(roomId, limit)
 

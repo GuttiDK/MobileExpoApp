@@ -20,17 +20,17 @@ export async function POST(request: NextRequest) {
   const { name, email, password } = parsed.data
   const db = getDb()
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  const existing = await db.prepare('SELECT id FROM users WHERE email = ?').get(email)
   if (existing) {
     return NextResponse.json({ error: 'Email er allerede i brug' }, { status: 409 })
   }
 
   const password_hash = await bcrypt.hash(password, 10)
-  const result = db.prepare(
-    'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)'
-  ).run(name, email, password_hash)
+  const result = await db.prepare(
+    'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id'
+  ).get(name, email, password_hash)
 
-  const user = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as { id: number; name: string; email: string; created_at: string }
+  const user = await db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?').get(result.id) as { id: number; name: string; email: string; created_at: string }
   const token = signToken({ userId: user.id, email: user.email })
 
   const response = NextResponse.json({ user, token }, { status: 201 })

@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   const targetUserId = parseInt(userId, 10)
   const db = getDb()
 
-  const me = db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
+  const me = await db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
   if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
   if (targetUserId === session.userId) return NextResponse.json({ error: 'Kan ikke ændre din egen rolle' }, { status: 400 })
 
@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   const parsed = updateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Ugyldig rolle' }, { status: 400 })
 
-  db.prepare('UPDATE house_members SET role = ? WHERE house_id = ? AND user_id = ?').run(parsed.data.role, houseId, targetUserId)
+  await db.prepare('UPDATE house_members SET role = ? WHERE house_id = ? AND user_id = ?').run(parsed.data.role, houseId, targetUserId)
   return NextResponse.json({ ok: true })
 }
 
@@ -39,10 +39,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   const targetUserId = parseInt(userId, 10)
   const db = getDb()
 
-  const me = db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
+  const me = await db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
   if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
   if (targetUserId === session.userId) return NextResponse.json({ error: 'Kan ikke fjerne dig selv' }, { status: 400 })
 
-  db.prepare('DELETE FROM house_members WHERE house_id = ? AND user_id = ?').run(houseId, targetUserId)
+  await db.prepare('DELETE FROM house_members WHERE house_id = ? AND user_id = ?').run(houseId, targetUserId)
   return NextResponse.json({ ok: true })
 }

@@ -12,10 +12,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   const houseId = parseInt(id, 10)
   const db = getDb()
 
-  const member = db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
+  const member = await db.prepare('SELECT role FROM house_members WHERE house_id = ? AND user_id = ?').get(houseId, session.userId) as { role: string } | undefined
   if (!member) return NextResponse.json({ error: 'Ikke fundet' }, { status: 404 })
   if (member.role === 'owner') return NextResponse.json({ error: 'Ejeren kan ikke forlade huset. Slet huset i stedet.' }, { status: 400 })
 
-  db.prepare('DELETE FROM house_members WHERE house_id = ? AND user_id = ?').run(houseId, session.userId)
+  await db.prepare('DELETE FROM house_members WHERE house_id = ? AND user_id = ?').run(houseId, session.userId)
   return NextResponse.json({ ok: true })
 }

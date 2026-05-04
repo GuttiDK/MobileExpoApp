@@ -8,10 +8,10 @@ function getUserId(c: any): number {
 }
 
 // Get latest readings for all rooms the user has access to
-sensorsRouter.get("/latest", (c) => {
+sensorsRouter.get("/latest", async (c) => {
   const userId = getUserId(c);
 
-  const readings = db.query(`
+  const readings = await db.query(`
     SELECT r.id as room_id, r.name as room_name, h.name as house_name,
            sr.temperature, sr.humidity, sr.recorded_at
     FROM rooms r
@@ -31,7 +31,7 @@ sensorsRouter.post("/:roomId", async (c) => {
   const userId = getUserId(c);
   const roomId = Number(c.req.param("roomId"));
 
-  const room = db.query(`
+  const room = await db.query(`
     SELECT r.*, hm.role
     FROM rooms r
     JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
@@ -48,7 +48,7 @@ sensorsRouter.post("/:roomId", async (c) => {
     return c.json({ error: "At least one of temperature or humidity required" }, 400);
   }
 
-  const reading = db
+  const reading = await db
     .query("INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?) RETURNING *")
     .get(roomId, temperature ?? null, humidity ?? null) as any;
 
