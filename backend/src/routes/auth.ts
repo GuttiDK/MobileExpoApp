@@ -41,7 +41,7 @@ authRouter.post("/register", async (c) => {
   const hash = await Bun.password.hash(password);
 
   const result = await db
-    .query("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id, name, email, created_at")
+    .query("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id, name, email, is_admin, created_at")
     .get(name, email, hash) as any;
 
   const token = await makeToken(result.id, result.email);
@@ -60,7 +60,7 @@ authRouter.post("/login", async (c) => {
   const { email, password } = parsed.data;
 
   const user = await db
-    .query("SELECT id, name, email, password_hash FROM users WHERE email = ?")
+    .query("SELECT id, name, email, password_hash, is_admin FROM users WHERE email = ?")
     .get(email) as any;
 
   if (!user) {
@@ -75,7 +75,7 @@ authRouter.post("/login", async (c) => {
   const token = await makeToken(user.id, user.email);
 
   return c.json({
-    user: { id: user.id, name: user.name, email: user.email },
+    user: { id: user.id, name: user.name, email: user.email, is_admin: user.is_admin },
     token,
   });
 });

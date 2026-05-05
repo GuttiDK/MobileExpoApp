@@ -104,6 +104,26 @@ export const api = {
         body: JSON.stringify({ temperature, humidity }),
       }),
   },
+
+  admin: {
+    getUsers: () => request<{ users: AdminUser[] }>("/admin/users"),
+    resetPassword: (userId: number, password: string) =>
+      request<{ ok: boolean }>(`/admin/users/${userId}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password }),
+      }),
+    getRooms: () => request<{ rooms: AdminRoom[] }>("/admin/rooms"),
+    updateRoom: (id: number, data: { name?: string; description?: string | null; icon?: string; mqtt_topic?: string | null }) =>
+      request<{ room: AdminRoom }>(`/admin/rooms/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    generateData: (roomId: number, count: number, temperature?: number, humidity?: number) =>
+      request<{ count: number }>(`/admin/rooms/${roomId}/generate`, {
+        method: "POST",
+        body: JSON.stringify({ count, ...(temperature !== undefined ? { temperature } : {}), ...(humidity !== undefined ? { humidity } : {}) }),
+      }),
+  },
 };
 
 // Types
@@ -111,7 +131,26 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  is_admin?: boolean;
   created_at?: string;
+}
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface AdminRoom {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string;
+  mqtt_topic: string | null;
+  house_id: number;
+  house_name: string;
 }
 
 export interface House {

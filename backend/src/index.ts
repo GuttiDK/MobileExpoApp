@@ -6,6 +6,7 @@ import { authRouter } from "./routes/auth";
 import { housesRouter } from "./routes/houses";
 import { roomsRouter } from "./routes/rooms";
 import { sensorsRouter } from "./routes/sensors";
+import { adminRouter } from "./routes/admin";
 import { mqttService } from "./services/mqtt";
 
 const app = new Hono();
@@ -29,6 +30,7 @@ api.use(
 api.route("/houses", housesRouter);
 api.route("/rooms", roomsRouter);
 api.route("/sensors", sensorsRouter);
+api.route("/admin", adminRouter);
 
 app.route("/api", api);
 

@@ -117,9 +117,16 @@ export default function HousesScreen({ navigation }: any) {
           <Text style={styles.greeting}>Hej, {user?.name?.split(" ")[0]} 👋</Text>
           <Text style={styles.headerTitle}>Dine Huse</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Log ud</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {user?.is_admin && (
+            <TouchableOpacity onPress={() => navigation.navigate("Admin")} style={styles.adminBtn}>
+              <Text style={styles.adminBtnText}>🔧 Admin</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Log ud</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -220,6 +227,9 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 14, color: "#64748b" },
   headerTitle: { fontSize: 28, fontWeight: "800", color: "#f1f5f9", marginTop: 2 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  adminBtn: { padding: 8 },
+  adminBtnText: { color: "#f59e0b", fontSize: 14, fontWeight: "600" },
   logoutBtn: { padding: 8 },
   logoutText: { color: "#64748b", fontSize: 14 },
   list: { padding: 16, gap: 12 },

@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - 'docker'
+  pull_request:
+    branches:
+      - 'docker'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all Docker images
+        run: docker compose build --no-cache
+
+      - name: Verify images exist
+        run: |
+          docker image inspect mobileexpoapp-backend
+          docker image inspect mobileexpoapp-nextjs
+          docker image inspect mobileexpoapp-expo
