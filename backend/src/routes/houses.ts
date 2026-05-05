@@ -68,11 +68,16 @@ housesRouter.get("/:id", async (c) => {
   const userId = getUserId(c);
   const houseId = Number(c.req.param("id"));
 
-  const member = await db.query(
-    "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
-  ).get(houseId, userId) as any;
-
-  if (!member) return c.json({ error: "Not found or no access" }, 404);
+  const currentUser = await db.query("SELECT is_admin FROM users WHERE id = ?").get(userId) as any;
+  let member: any;
+  if (currentUser?.is_admin) {
+    member = { role: "viewer" };
+  } else {
+    member = await db.query(
+      "SELECT role FROM house_members WHERE house_id = ? AND user_id = ?"
+    ).get(houseId, userId) as any;
+    if (!member) return c.json({ error: "Not found or no access" }, 404);
+  }
 
   const house = await db.query(`
     SELECT h.*, u.name as owner_name

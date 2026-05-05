@@ -95,6 +95,13 @@ async function initSchema() {
       humidity DOUBLE PRECISION,
       recorded_at TIMESTAMPTZ DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
     CREATE INDEX IF NOT EXISTS idx_sensor_room ON sensor_readings(room_id);
     CREATE INDEX IF NOT EXISTS idx_sensor_recorded ON sensor_readings(recorded_at);
     CREATE INDEX IF NOT EXISTS idx_members_user ON house_members(user_id);

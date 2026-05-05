@@ -15,6 +15,21 @@ adminRouter.use("*", async (c, next) => {
   await next();
 });
 
+adminRouter.get("/users/:id/houses", async (c) => {
+  const userId = Number(c.req.param("id"));
+  const houses = await db.query(`
+    SELECT h.id, h.name, h.description, h.invite_code, h.created_at,
+           u.name as owner_name, hm.role as user_role,
+           (SELECT COUNT(*) FROM house_members WHERE house_id = h.id) as member_count,
+           (SELECT COUNT(*) FROM rooms WHERE house_id = h.id) as room_count
+    FROM houses h
+    JOIN house_members hm ON hm.house_id = h.id AND hm.user_id = ?
+    JOIN users u ON u.id = h.owner_id
+    ORDER BY h.created_at DESC
+  `).all(userId);
+  return c.json({ houses });
+});
+
 adminRouter.get("/users", async (c) => {
   const users = await db.query(
     "SELECT id, name, email, is_admin, created_at FROM users ORDER BY created_at ASC"

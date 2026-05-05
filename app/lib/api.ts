@@ -106,6 +106,8 @@ export const api = {
   },
 
   admin: {
+    getUserHouses: (userId: number) =>
+      request<{ houses: AdminUserHouse[] }>(`/admin/users/${userId}/houses`),
     getUsers: () => request<{ users: AdminUser[] }>("/admin/users"),
     resetPassword: (userId: number, password: string) =>
       request<{ ok: boolean }>(`/admin/users/${userId}/password`, {
@@ -140,6 +142,18 @@ export interface AdminUser {
   name: string;
   email: string;
   is_admin: boolean;
+  created_at: string;
+}
+
+export interface AdminUserHouse {
+  id: number;
+  name: string;
+  description: string | null;
+  invite_code: string;
+  owner_name: string;
+  user_role: string;
+  member_count: number;
+  room_count: number;
   created_at: string;
 }
 

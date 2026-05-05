@@ -165,12 +165,20 @@ export default function AdminScreen({ navigation }: any) {
                   Oprettet {new Date(item.created_at).toLocaleDateString("da-DK")}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => { setResetTarget(item); setNewPassword(""); }}
-              >
-                <Text style={styles.actionBtnText}>Nulstil kode</Text>
-              </TouchableOpacity>
+              <View style={styles.userActions}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.blueBtn]}
+                  onPress={() => navigation.navigate("AdminUserHouses", { userId: item.id, userName: item.name })}
+                >
+                  <Text style={[styles.actionBtnText, styles.blueBtnText]}>Se huse</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => { setResetTarget(item); setNewPassword(""); }}
+                >
+                  <Text style={styles.actionBtnText}>Nulstil kode</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         />
@@ -381,7 +389,10 @@ const styles = StyleSheet.create({
   mqttTopic: { fontSize: 12, color: "#34d399", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", marginTop: 4 },
   adminBadge: { backgroundColor: "#f59e0b22", borderWidth: 1, borderColor: "#f59e0b55", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   adminBadgeText: { fontSize: 11, fontWeight: "600", color: "#f59e0b" },
+  userActions: { flexDirection: "column", gap: 6 },
   roomActions: { flexDirection: "column", gap: 6 },
+  blueBtn: { backgroundColor: "#1d3a6e", borderColor: "#2563eb" },
+  blueBtnText: { color: "#60a5fa" },
   actionBtn: { backgroundColor: "#0f172a", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#334155" },
   actionBtnText: { color: "#94a3b8", fontSize: 13, fontWeight: "600" },
   greenBtn: { backgroundColor: "#052e16", borderColor: "#166534" },

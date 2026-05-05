@@ -112,12 +112,18 @@ roomsRouter.get("/:id/history", async (c) => {
   const roomId = Number(c.req.param("id"));
   const limit = Math.min(Number(c.req.query("limit") || 100), 500);
 
-  const room = await db.query(`
-    SELECT r.*, hm.role
-    FROM rooms r
-    JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
-    WHERE r.id = ?
-  `).get(userId, roomId) as any;
+  const currentUser = await db.query("SELECT is_admin FROM users WHERE id = ?").get(userId) as any;
+  let room: any;
+  if (currentUser?.is_admin) {
+    room = await db.query("SELECT * FROM rooms WHERE id = ?").get(roomId);
+  } else {
+    room = await db.query(`
+      SELECT r.*, hm.role
+      FROM rooms r
+      JOIN house_members hm ON hm.house_id = r.house_id AND hm.user_id = ?
+      WHERE r.id = ?
+    `).get(userId, roomId);
+  }
 
   if (!room) return c.json({ error: "Room not found or no access" }, 404);
 

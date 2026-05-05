@@ -8,6 +8,7 @@ import HousesScreen from "./screens/HousesScreen";
 import HouseDetailScreen from "./screens/HouseDetailScreen";
 import RoomDetailScreen from "./screens/RoomDetailScreen";
 import AdminScreen from "./screens/AdminScreen";
+import AdminUserHousesScreen from "./screens/AdminUserHousesScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -45,6 +46,11 @@ function AppNavigator() {
               name="Admin"
               component={AdminScreen}
               options={{ title: "🔧 Admin" }}
+            />
+            <Stack.Screen
+              name="AdminUserHouses"
+              component={AdminUserHousesScreen}
+              options={({ route }: any) => ({ title: `${route.params?.userName}s huse` })}
             />
           </>
         )}

@@ -20,10 +20,12 @@
     "pg": "^8.11.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "nodemailer": "^6.9.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/nodemailer": "^6.4.0",
     "@types/node": "^20",
     "@types/pg": "^8.10.0",
     "@types/react": "^19",

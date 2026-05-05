@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
   const { login, register } = useAuth()
   const router = useRouter()
 
@@ -21,10 +22,22 @@ export default function AuthPage() {
     try {
       if (mode === 'login') {
         await login(email, password)
-      } else {
+        router.replace('/houses')
+      } else if (mode === 'register') {
         await register(name, email, password)
+        router.replace('/houses')
+      } else {
+        const res = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Noget gik galt')
+        }
+        setForgotSent(true)
       }
-      router.replace('/houses')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noget gik galt')
     } finally {
@@ -60,25 +73,63 @@ export default function AuthPage() {
           )}
 
           {mode === 'forgot' ? (
-            <div className="space-y-4">
-              <div className="text-center">
+            forgotSent ? (
+              <div className="space-y-4 text-center">
+                <div className="text-4xl mb-2">📧</div>
+                <h2 className="font-semibold text-slate-100">Tjek din indbakke</h2>
+                <p className="text-sm text-slate-400">
+                  Hvis der findes en konto med den email, er der sendt et link til at nulstille adgangskoden.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError(''); setForgotSent(false) }}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold py-3 rounded-xl transition-colors"
+                >
+                  ← Tilbage til log ind
+                </button>
+              </div>
+            ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="text-center mb-2">
                 <div className="text-4xl mb-3">🔑</div>
                 <h2 className="font-semibold text-slate-100 mb-1">Glemt adgangskode?</h2>
                 <p className="text-sm text-slate-400">
-                  Kontakt en administrator og bed dem om at nulstille din adgangskode via admin-panelet.
+                  Indtast din email, så sender vi et link til at nulstille din adgangskode.
                 </p>
               </div>
-              <div className="bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-300">
-                Din email: <span className="font-mono text-slate-100">{email || '—'}</span>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="din@email.dk"
+                  required
+                  maxLength={254}
+                  className="w-full bg-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:border-blue-500"
+                />
               </div>
+              {error && (
+                <div className="bg-red-900/40 border border-red-700 rounded-xl px-4 py-3 text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
+              >
+                {loading ? 'Sender...' : 'Send nulstillings-link'}
+              </button>
               <button
                 type="button"
                 onClick={() => { setMode('login'); setError('') }}
-                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold py-3 rounded-xl transition-colors"
+                className="w-full text-sm text-slate-500 hover:text-slate-300 transition-colors pt-1"
               >
                 ← Tilbage til log ind
               </button>
-            </div>
+            </form>
+            )
           ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (

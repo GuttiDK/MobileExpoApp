@@ -200,7 +200,18 @@ export default function HouseDetailPage({ params }: { params: Params }) {
           {/* Invite code banner */}
           <div
             className="mt-3 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2 flex items-center justify-between cursor-pointer"
-            onClick={() => navigator.clipboard.writeText(house.invite_code)}
+            onClick={() => {
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(house.invite_code)
+              } else {
+                const el = document.createElement('textarea')
+                el.value = house.invite_code
+                document.body.appendChild(el)
+                el.select()
+                document.execCommand('copy')
+                document.body.removeChild(el)
+              }
+            }}
           >
             <span className="text-slate-400 text-sm">Invitationskode</span>
             <div className="flex items-center gap-2">
