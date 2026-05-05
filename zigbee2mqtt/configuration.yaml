@@ -13,7 +13,7 @@ mqtt:
 serial:
   # nRF52840 enumerates as CDC-ACM — always /dev/ttyACM0 on Linux
   port: /dev/ttyACM0
-  adapter: auto
+  adapter: zboss
 
 data_path: /app/data
 
