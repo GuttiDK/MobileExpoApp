@@ -111,6 +111,18 @@ async function initSchema() {
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);`);
 }
 
-await initSchema();
+async function connectWithRetry(retries = 10, delayMs = 2000): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await initSchema();
+      console.log("Database initialized");
+      return;
+    } catch (err: any) {
+      if (i === retries - 1) throw err;
+      console.log(`Database not ready, retrying in ${delayMs}ms... (${i + 1}/${retries})`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
-console.log("Database initialized");
+await connectWithRetry();
