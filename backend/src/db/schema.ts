@@ -56,9 +56,12 @@ async function initSchema() {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      is_admin BOOLEAN DEFAULT false,
       created_at TIMESTAMPTZ DEFAULT now()
     )
   `);
+
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false`);
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS houses (
