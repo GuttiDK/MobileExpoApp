@@ -29,9 +29,11 @@ services:
       - zigbee2mqtt-data:/app/data
       - ./zigbee2mqtt/configuration.yaml:/app/data/configuration.yaml
     devices:
-      # Adjust to match your Zigbee coordinator device path
-      # On Windows/Docker Desktop: set up USB passthrough with usbipd-win first
-      - /dev/ttyUSB0:/dev/ttyUSB0
+      # nRF52840 enumerates as ACM (CDC), not a USB serial adapter
+      # On Windows/Docker Desktop: attach the dongle with usbipd-win first:
+      #   usbipd list  →  find the dongle's BUSID
+      #   usbipd attach --wsl --busid <BUSID>
+      - /dev/ttyACM0:/dev/ttyACM0
     environment:
       - TZ=Europe/Copenhagen
     depends_on:

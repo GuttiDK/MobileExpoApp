@@ -11,11 +11,8 @@ mqtt:
   # password: password
 
 serial:
-  # Common paths:
-  #   Linux USB: /dev/ttyUSB0 or /dev/ttyACM0
-  #   SONOFF Zigbee 3.0 USB Dongle Plus: /dev/ttyUSB0
-  #   ConBee II: /dev/ttyACM0
-  port: /dev/ttyUSB0
+  # nRF52840 enumerates as CDC-ACM — always /dev/ttyACM0 on Linux
+  port: /dev/ttyACM0
   adapter: auto
 
 data_path: /app/data
