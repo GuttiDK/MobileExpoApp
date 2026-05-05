@@ -9,6 +9,7 @@ import HouseDetailScreen from "./screens/HouseDetailScreen";
 import RoomDetailScreen from "./screens/RoomDetailScreen";
 import AdminScreen from "./screens/AdminScreen";
 import AdminUserHousesScreen from "./screens/AdminUserHousesScreen";
+import DevicesScreen from "./screens/DevicesScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -46,6 +47,11 @@ function AppNavigator() {
               name="Admin"
               component={AdminScreen}
               options={{ title: "🔧 Admin" }}
+            />
+            <Stack.Screen
+              name="Devices"
+              component={DevicesScreen}
+              options={{ title: "💡 Apparater" }}
             />
             <Stack.Screen
               name="AdminUserHouses"

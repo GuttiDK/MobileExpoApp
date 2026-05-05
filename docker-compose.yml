@@ -22,6 +22,22 @@ services:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
 
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    network_mode: host
+    volumes:
+      - zigbee2mqtt-data:/app/data
+      - ./zigbee2mqtt/configuration.yaml:/app/data/configuration.yaml
+    devices:
+      # Adjust to match your Zigbee coordinator device path
+      # On Windows/Docker Desktop: set up USB passthrough with usbipd-win first
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - TZ=Europe/Copenhagen
+    depends_on:
+      - mqtt
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -89,3 +105,4 @@ volumes:
   expo-node-modules:
   mosquitto-data:
   mosquitto-log:
+  zigbee2mqtt-data:

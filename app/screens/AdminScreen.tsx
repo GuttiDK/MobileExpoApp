@@ -4,18 +4,26 @@ import {
   Modal, TextInput, ActivityIndicator, Alert, RefreshControl, Platform, ScrollView,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { api, AdminUser, AdminRoom } from "../lib/api";
+import { api, AdminUser, AdminRoom, Device } from "../lib/api";
 
 const ICONS = ["🏠", "🛋️", "🛏️", "🚿", "🍳", "🚗", "🌿", "📺", "💡", "❄️"];
 
-type Tab = "users" | "rooms";
+const DEVICE_TYPE_ICON: Record<string, string> = {
+  light: "💡", switch: "🔌", sensor: "🌡️", cover: "🪟", lock: "🔒", fan: "🌀", unknown: "📡",
+};
+
+type Tab = "users" | "rooms" | "devices";
 
 export default function AdminScreen({ navigation }: any) {
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Assign device to room modal
+  const [assignDevice, setAssignDevice] = useState<Device | null>(null);
 
   // Reset password modal
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
@@ -39,9 +47,10 @@ export default function AdminScreen({ navigation }: any) {
 
   const loadAll = useCallback(async () => {
     try {
-      const [uRes, rRes] = await Promise.all([api.admin.getUsers(), api.admin.getRooms()]);
+      const [uRes, rRes, dRes] = await Promise.all([api.admin.getUsers(), api.admin.getRooms(), api.devices.list()]);
       setUsers(uRes.users);
       setRooms(rRes.rooms);
+      setDevices(dRes.devices);
     } catch (err: any) {
       if (err.message?.includes("Forbidden") || err.message?.includes("403")) {
         Alert.alert("Ingen adgang", "Du har ikke admin-rettigheder.");
@@ -130,7 +139,7 @@ export default function AdminScreen({ navigation }: any) {
           onPress={() => setTab("users")}
         >
           <Text style={[styles.tabText, tab === "users" && styles.tabTextActive]}>
-            👥 Brugere ({users.length})
+            👥 ({users.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -138,7 +147,15 @@ export default function AdminScreen({ navigation }: any) {
           onPress={() => setTab("rooms")}
         >
           <Text style={[styles.tabText, tab === "rooms" && styles.tabTextActive]}>
-            🏠 Rum ({rooms.length})
+            🏠 ({rooms.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === "devices" && styles.tabActive]}
+          onPress={() => setTab("devices")}
+        >
+          <Text style={[styles.tabText, tab === "devices" && styles.tabTextActive]}>
+            📡 ({devices.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -232,6 +249,102 @@ export default function AdminScreen({ navigation }: any) {
           )}
         />
       )}
+
+      {tab === "devices" && (
+        <FlatList
+          data={devices}
+          keyExtractor={(d) => d.id.toString()}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAll(); }} tintColor="#3b82f6" />}
+          contentContainerStyle={[styles.list, devices.length === 0 && { flex: 1, justifyContent: "center" as const }]}
+          ListEmptyComponent={
+            <View style={{ alignItems: "center" as const, paddingVertical: 40, gap: 8 }}>
+              <Text style={{ fontSize: 48 }}>📡</Text>
+              <Text style={styles.cardTitle}>Ingen enheder opdaget</Text>
+              <Text style={styles.cardSub}>Start Zigbee2MQTT og par dine enheder</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardBody}>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardTitle}>
+                    {DEVICE_TYPE_ICON[item.type] ?? "📡"} {item.friendly_name}
+                  </Text>
+                  {item.state?.state && (
+                    <View style={[styles.adminBadge, item.state.state === "ON" ? styles.onBadge : styles.offBadge]}>
+                      <Text style={[styles.adminBadgeText, item.state.state === "ON" ? styles.onBadgeText : {}]}>
+                        {item.state.state}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {item.vendor || item.model ? (
+                  <Text style={styles.cardSub}>{[item.vendor, item.model].filter(Boolean).join(" · ")}</Text>
+                ) : null}
+                <Text style={styles.cardMeta}>
+                  {item.room_name ? `${item.house_name} › ${item.room_name}` : "Intet rum tildelt"}
+                </Text>
+                {item.last_seen && (
+                  <Text style={styles.cardMeta}>
+                    Sidst set: {new Date(item.last_seen).toLocaleString("da-DK")}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => setAssignDevice(item)}
+              >
+                <Text style={styles.actionBtnText}>Tildel rum</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
+
+      {/* Assign device to room modal */}
+      <Modal visible={!!assignDevice} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Tildel rum</Text>
+            {assignDevice && <Text style={styles.modalSub}>{assignDevice.friendly_name}</Text>}
+            <ScrollView style={{ maxHeight: 360 }}>
+              <TouchableOpacity
+                style={[styles.roomOption, assignDevice?.room_id === null && styles.roomOptionActive]}
+                onPress={async () => {
+                  if (!assignDevice) return;
+                  try {
+                    await api.devices.update(assignDevice.id, { room_id: null });
+                    setAssignDevice(null);
+                    await loadAll();
+                  } catch (err: any) { Alert.alert("Fejl", err.message); }
+                }}
+              >
+                <Text style={styles.roomOptionText}>— Intet rum</Text>
+              </TouchableOpacity>
+              {rooms.map(room => (
+                <TouchableOpacity
+                  key={room.id}
+                  style={[styles.roomOption, assignDevice?.room_id === room.id && styles.roomOptionActive]}
+                  onPress={async () => {
+                    if (!assignDevice) return;
+                    try {
+                      await api.devices.update(assignDevice.id, { room_id: room.id });
+                      setAssignDevice(null);
+                      await loadAll();
+                    } catch (err: any) { Alert.alert("Fejl", err.message); }
+                  }}
+                >
+                  <Text style={styles.roomOptionText}>{room.icon} {room.name}</Text>
+                  <Text style={styles.roomOptionSub}>{room.house_name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setAssignDevice(null)}>
+              <Text style={styles.cancelBtnText}>Annuller</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Reset password modal */}
       <Modal visible={!!resetTarget} transparent animationType="slide">
@@ -397,6 +510,16 @@ const styles = StyleSheet.create({
   actionBtnText: { color: "#94a3b8", fontSize: 13, fontWeight: "600" },
   greenBtn: { backgroundColor: "#052e16", borderColor: "#166534" },
   greenBtnText: { color: "#34d399" },
+  onBadge: { backgroundColor: "#16a34a22", borderColor: "#16a34a55" },
+  onBadgeText: { color: "#4ade80" },
+  offBadge: { backgroundColor: "#0f172a", borderColor: "#334155" },
+  roomOption: {
+    paddingVertical: 14, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: "#334155",
+  },
+  roomOptionActive: { backgroundColor: "#1d4ed822" },
+  roomOptionText: { fontSize: 15, color: "#f1f5f9", fontWeight: "500" },
+  roomOptionSub: { fontSize: 12, color: "#64748b", marginTop: 2 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modal: { backgroundColor: "#1e293b", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
   modalTitle: { fontSize: 18, fontWeight: "800", color: "#f1f5f9" },

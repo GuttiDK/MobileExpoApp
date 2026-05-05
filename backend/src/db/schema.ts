@@ -109,6 +109,24 @@ async function initSchema() {
 
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_room_id ON sensor_readings(room_id);`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sensor_readings_recorded_at ON sensor_readings(recorded_at);`);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS devices (
+      id SERIAL PRIMARY KEY,
+      friendly_name TEXT UNIQUE NOT NULL,
+      ieee_address TEXT UNIQUE,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      type TEXT NOT NULL DEFAULT 'unknown',
+      model TEXT,
+      vendor TEXT,
+      description TEXT,
+      definition JSONB,
+      state JSONB NOT NULL DEFAULT '{}',
+      last_seen TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_devices_room ON devices(room_id);`);
 }
 
 async function connectWithRetry(retries = 10, delayMs = 2000): Promise<void> {

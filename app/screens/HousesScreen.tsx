@@ -118,6 +118,9 @@ export default function HousesScreen({ navigation }: any) {
           <Text style={styles.headerTitle}>Dine Huse</Text>
         </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => navigation.navigate("Devices")} style={styles.devicesBtn}>
+            <Text style={styles.devicesBtnText}>💡</Text>
+          </TouchableOpacity>
           {user?.is_admin && (
             <TouchableOpacity onPress={() => navigation.navigate("Admin")} style={styles.adminBtn}>
               <Text style={styles.adminBtnText}>🔧 Admin</Text>
@@ -228,6 +231,8 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 14, color: "#64748b" },
   headerTitle: { fontSize: 28, fontWeight: "800", color: "#f1f5f9", marginTop: 2 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  devicesBtn: { padding: 8 },
+  devicesBtnText: { fontSize: 20 },
   adminBtn: { padding: 8 },
   adminBtnText: { color: "#f59e0b", fontSize: 14, fontWeight: "600" },
   logoutBtn: { padding: 8 },

@@ -105,6 +105,20 @@ export const api = {
       }),
   },
 
+  devices: {
+    list: () => request<{ devices: Device[] }>("/devices"),
+    set: (id: number, payload: Record<string, unknown>) =>
+      request<{ ok: boolean }>(`/devices/${id}/set`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    update: (id: number, data: { room_id?: number | null; friendly_name?: string }) =>
+      request<{ device: Device }>(`/devices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  },
+
   admin: {
     getUserHouses: (userId: number) =>
       request<{ houses: AdminUserHouse[] }>(`/admin/users/${userId}/houses`),
@@ -142,6 +156,33 @@ export interface AdminUser {
   name: string;
   email: string;
   is_admin: boolean;
+  created_at: string;
+}
+
+export type DeviceType = "light" | "switch" | "sensor" | "cover" | "lock" | "fan" | "unknown";
+
+export interface Device {
+  id: number;
+  friendly_name: string;
+  ieee_address: string | null;
+  room_id: number | null;
+  room_name: string | null;
+  house_name: string | null;
+  type: DeviceType;
+  model: string | null;
+  vendor: string | null;
+  description: string | null;
+  state: {
+    state?: "ON" | "OFF";
+    brightness?: number;
+    color_temp?: number;
+    temperature?: number;
+    humidity?: number;
+    battery?: number;
+    linkquality?: number;
+    [key: string]: unknown;
+  };
+  last_seen: string | null;
   created_at: string;
 }
 

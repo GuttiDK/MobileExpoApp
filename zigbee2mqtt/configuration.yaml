@@ -1,0 +1,33 @@
+homeassistant: false
+
+# Set to false after all your devices are paired
+permit_join: true
+
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://localhost:1883
+  # Uncomment if your MQTT broker requires auth:
+  # user: username
+  # password: password
+
+serial:
+  # Common paths:
+  #   Linux USB: /dev/ttyUSB0 or /dev/ttyACM0
+  #   SONOFF Zigbee 3.0 USB Dongle Plus: /dev/ttyUSB0
+  #   ConBee II: /dev/ttyACM0
+  port: /dev/ttyUSB0
+  adapter: auto
+
+data_path: /app/data
+
+advanced:
+  log_level: info
+  # Zigbee channel - change only if you have interference (11, 15, 20, 25)
+  channel: 11
+  # Avoid slashes in friendly names - the backend uses them as MQTT subtopics
+  last_seen: ISO_8601
+
+# Zigbee2MQTT web frontend (accessible on port 8080)
+frontend:
+  enabled: true
+  port: 8080
