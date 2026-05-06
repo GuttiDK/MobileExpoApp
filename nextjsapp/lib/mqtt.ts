@@ -11,7 +11,18 @@ declare global {
   var __z2mStates: Map<string, Z2mDeviceState> | undefined
   // eslint-disable-next-line no-var
   var __z2mBridgeOnline: boolean | undefined
+  // eslint-disable-next-line no-var
+  var __z2mListeners: Set<Z2mStateListener> | undefined
 }
+
+export type Z2mStateEvent = {
+  ieee_address: string
+  friendly_name: string
+  state: Record<string, unknown>
+  receivedAt: string
+}
+
+export type Z2mStateListener = (event: Z2mStateEvent) => void
 
 export type Z2mExpose = {
   type?: string
@@ -70,6 +81,28 @@ function devices() {
 function states() {
   if (!global.__z2mStates) global.__z2mStates = new Map()
   return global.__z2mStates
+}
+
+function listeners() {
+  if (!global.__z2mListeners) global.__z2mListeners = new Set()
+  return global.__z2mListeners
+}
+
+export function onZ2mStateUpdate(listener: Z2mStateListener): () => void {
+  listeners().add(listener)
+  return () => {
+    listeners().delete(listener)
+  }
+}
+
+function emitStateUpdate(event: Z2mStateEvent) {
+  for (const fn of listeners()) {
+    try {
+      fn(event)
+    } catch (err) {
+      console.error('[Z2M] Listener error:', err)
+    }
+  }
 }
 
 export function initMqtt() {
@@ -198,8 +231,41 @@ function handleBridgeDevices(payload: string) {
       if (dev?.ieee_address) map.set(dev.ieee_address, dev)
     }
     console.log(`[Z2M] Devices updated: ${map.size}`)
+    persistDevices(list).catch((err) =>
+      console.error('[Z2M] Failed to persist devices:', err),
+    )
   } catch (err) {
     console.error('[Z2M] Failed to parse bridge/devices:', err)
+  }
+}
+
+async function persistDevices(list: Z2mDevice[]) {
+  const database = await db()
+  for (const dev of list) {
+    if (!dev?.ieee_address || dev.type === 'Coordinator') continue
+    await database
+      .prepare(
+        `INSERT INTO devices (ieee_address, friendly_name, type, model, vendor, description, supported, exposes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+         ON CONFLICT (ieee_address) DO UPDATE SET
+           friendly_name = EXCLUDED.friendly_name,
+           type = EXCLUDED.type,
+           model = EXCLUDED.model,
+           vendor = EXCLUDED.vendor,
+           description = EXCLUDED.description,
+           supported = EXCLUDED.supported,
+           exposes = EXCLUDED.exposes`,
+      )
+      .run(
+        dev.ieee_address,
+        dev.friendly_name,
+        dev.type ?? null,
+        dev.definition?.model ?? dev.model_id ?? null,
+        dev.definition?.vendor ?? dev.manufacturer ?? null,
+        dev.definition?.description ?? null,
+        dev.supported ?? false,
+        JSON.stringify(dev.definition?.exposes ?? []),
+      )
   }
 }
 
@@ -225,7 +291,62 @@ function handleZ2mDeviceState(friendlyName: string, payload: string) {
     return
   }
   if (!parsed || typeof parsed !== 'object') return
-  states().set(friendlyName, { payload: parsed, receivedAt: new Date().toISOString() })
+  const receivedAt = new Date().toISOString()
+  states().set(friendlyName, { payload: parsed, receivedAt })
+
+  let ieee: string | undefined
+  for (const d of devices().values()) {
+    if (d.friendly_name === friendlyName) {
+      ieee = d.ieee_address
+      break
+    }
+  }
+  if (ieee) {
+    emitStateUpdate({ ieee_address: ieee, friendly_name: friendlyName, state: parsed, receivedAt })
+  }
+
+  persistDeviceState(friendlyName, parsed).catch((err) =>
+    console.error(`[Z2M] Failed to persist state for ${friendlyName}:`, err),
+  )
+}
+
+async function persistDeviceState(friendlyName: string, payload: Record<string, unknown>) {
+  let dev: Z2mDevice | undefined
+  for (const d of devices().values()) {
+    if (d.friendly_name === friendlyName) {
+      dev = d
+      break
+    }
+  }
+  if (!dev) return
+
+  const database = await db()
+  await database
+    .prepare(
+      `INSERT INTO device_states (ieee_address, state, updated_at)
+       VALUES (?, ?::jsonb, now())
+       ON CONFLICT (ieee_address) DO UPDATE SET
+         state = EXCLUDED.state,
+         updated_at = EXCLUDED.updated_at`,
+    )
+    .run(dev.ieee_address, JSON.stringify(payload))
+
+  await database
+    .prepare('UPDATE devices SET last_seen = now() WHERE ieee_address = ?')
+    .run(dev.ieee_address)
+
+  const temperature = typeof payload.temperature === 'number' ? payload.temperature : null
+  const humidity = typeof payload.humidity === 'number' ? payload.humidity : null
+  if (temperature === null && humidity === null) return
+
+  const row = (await database
+    .prepare('SELECT room_id FROM devices WHERE ieee_address = ?')
+    .get(dev.ieee_address)) as { room_id: number | null } | undefined
+  if (!row?.room_id) return
+
+  await database
+    .prepare('INSERT INTO sensor_readings (room_id, temperature, humidity) VALUES (?, ?, ?)')
+    .run(row.room_id, temperature, humidity)
 }
 
 async function handleRoomMessage(topic: string, payload: string) {

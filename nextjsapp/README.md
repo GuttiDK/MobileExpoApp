@@ -35,7 +35,11 @@ nextjsapp/
 │   │   └── [id]/
 │   │       ├── page.tsx            # Hus-detaljer (rum + medlemmer)
 │   │       └── rooms/[roomId]/
-│   │           └── page.tsx        # Sensorhistorik for et rum
+│   │           └── page.tsx        # Sensorhistorik + devices i rum
+│   ├── devices/
+│   │   ├── page.tsx                # Global device-liste + pair-mode
+│   │   └── [ieee]/
+│   │       └── page.tsx            # Device-detalje med dynamiske kontroller
 │   └── api/
 │       ├── auth/
 │       │   ├── register/route.ts   # POST — opret bruger
@@ -54,15 +58,24 @@ nextjsapp/
 │       │   ├── route.ts            # POST
 │       │   └── [id]/
 │       │       ├── route.ts        # PATCH / DELETE
-│       │       └── history/route.ts # GET
-│       └── sensors/
-│           ├── latest/route.ts     # GET
-│           └── [roomId]/route.ts   # POST
+│       │       ├── history/route.ts # GET
+│       │       └── devices/route.ts # GET — devices i rum + tilgængelige
+│       ├── sensors/
+│       │   ├── latest/route.ts     # GET
+│       │   └── [roomId]/route.ts   # POST
+│       └── devices/
+│           ├── route.ts            # GET — list devices
+│           ├── permit-join/route.ts # POST
+│           ├── stream/route.ts     # GET — SSE state-stream
+│           └── [ieee]/
+│               ├── route.ts        # GET / PATCH / DELETE
+│               └── set/route.ts    # POST — kontrollér device
 ├── lib/
 │   ├── db.ts                       # PostgreSQL-opsætning og schema
 │   ├── auth.ts                     # JWT helpers (sign, verify, session)
-│   ├── mqtt.ts                     # MQTT singleton med lazy DB-import
+│   ├── mqtt.ts                     # MQTT + zigbee2mqtt bridge integration
 │   ├── apiClient.ts                # Client-side fetch wrapper + typer
+│   ├── deviceUtils.ts              # Device-kategorisering og expose-helpers
 │   └── authContext.tsx             # React auth context (use client)
 ├── instrumentation.ts              # Starter MQTT ved server-opstart
 ├── next.config.ts                  # Turbopack root, serverExternalPackages
@@ -131,6 +144,7 @@ npm run start
 | `MQTT_PORT` | MQTT-brokerens port | `1883` |
 | `MQTT_USERNAME` | MQTT-brugernavn (valgfrit) | — |
 | `MQTT_PASSWORD` | MQTT-adgangskode (valgfrit) | — |
+| `Z2M_BASE_TOPIC` | Base-topic for zigbee2mqtt (valgfrit) | `zigbee2mqtt` |
 
 ---
 
@@ -157,11 +171,60 @@ MQTT-klienten initialiseres ved server-opstart via `instrumentation.ts` og `lib/
 
 ---
 
+## Zigbee2MQTT integration
+
+Webappen integrerer direkte med [zigbee2mqtt](https://www.zigbee2mqtt.io/) via MQTT-broker'en og kræver ingen ekstra adapter — z2m's frontend kan stadig tilgås på `:8080` parallelt.
+
+### Funktioner
+
+- **Device discovery** — appen subscriberer på `zigbee2mqtt/bridge/devices` og bygger automatisk en liste over parrede enheder
+- **Pair-mode** — `/devices`-siden har en "Tilføj enhed"-knap der enabler `permit_join` med 254s countdown
+- **Kontrol** — tænd/sluk pærer, justér brightness, vælg farve (hex), justér farvetemperatur
+- **Sensorer** — temperatur, fugt, dør/vindue-kontakt og batteri vises live
+- **Realtid** — Server-Sent Events på `/api/devices/stream` pusher state-ændringer til UI'et uden polling
+- **Rum som grupper** — devices tilknyttes rum fra rum-detaljesiden ("+ Tilføj"-knap viser tilgængelige enheder)
+
+### MQTT-topics i brug
+
+| Topic | Retning | Formål |
+|-------|---------|--------|
+| `zigbee2mqtt/bridge/state` | sub | Online/offline-status for z2m |
+| `zigbee2mqtt/bridge/devices` | sub | Autoritativ device-liste (retained) |
+| `zigbee2mqtt/bridge/event` | sub | Join/leave/interview-events |
+| `zigbee2mqtt/{friendly_name}` | sub | Per-device state-opdateringer |
+| `zigbee2mqtt/{friendly_name}/set` | pub | Send kommandoer til device |
+| `zigbee2mqtt/bridge/request/permit_join` | pub | Toggle parring |
+| `zigbee2mqtt/bridge/request/device/remove` | pub | Fjern device fra netværket |
+| `zigbee2mqtt/bridge/request/device/rename` | pub | Omdøb device |
+
+### API-endpoints
+
+| Endpoint | Metode | Formål |
+|----------|--------|--------|
+| `/api/devices` | GET | List alle parrede devices |
+| `/api/devices/permit-join` | POST | Body `{ value: bool, time?: number }` — toggle parring |
+| `/api/devices/[ieee]` | GET / PATCH / DELETE | Hent/opdatér rum/omdøb/fjern device |
+| `/api/devices/[ieee]/set` | POST | Body med settable properties — kontrollér device |
+| `/api/devices/stream` | GET | Server-Sent Events stream af state-ændringer |
+| `/api/rooms/[id]/devices` | GET | Devices i et rum + tilgængelige til at tilføje |
+
+### Test-flow
+
+1. Start hele stacken: `docker compose up` (postgres, mosquitto, zigbee2mqtt, nextjs)
+2. Sæt nRF52840 til via USB (på Windows: `usbipd attach --wsl --busid <BUSID>`)
+3. Verificér z2m kører på `http://localhost:8080`
+4. Log ind på Next.js-appen på `http://localhost:3001` og gå til **📡 Enheder**
+5. Tryk "Tilføj enhed", sæt din zigbee-enhed i parringsmode — den dukker op i listen
+6. Klik på enheden for at åbne kontrol-siden (toggle, brightness-slider, farve-picker for lys; live-værdier for sensorer)
+7. Tilknyt enheden til et rum: gå til rum-siden → "+ Tilføj" → vælg device
+
+---
+
 ## Kendte begrænsninger
 
-- **Ingen realtids-push** — sensordata opdateres ved manuel genindlæsning (↺-knap)
 - **PostgreSQL** er den anbefalede database til flere samtidige brugere og containeriserede miljøer
 - **MQTT** kræver en løbende Node.js-server — fungerer ikke på serverless-platforme (Vercel)
+- **Sensor-historik** kræver at device er tilknyttet et rum — uden room_id gemmes kun seneste state, ikke historik
 
 ---
 

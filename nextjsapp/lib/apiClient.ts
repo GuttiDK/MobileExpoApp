@@ -47,6 +47,49 @@ export interface SensorReading {
   recorded_at: string
 }
 
+export interface Z2mExpose {
+  type?: string
+  name?: string
+  property?: string
+  access?: number
+  values?: unknown[]
+  unit?: string
+  value_min?: number
+  value_max?: number
+  value_step?: number
+  value_on?: unknown
+  value_off?: unknown
+  value_toggle?: unknown
+  features?: Z2mExpose[]
+}
+
+export interface RoomDevice {
+  ieee_address: string
+  friendly_name: string
+  type: string | null
+  model: string | null
+  vendor: string | null
+  state: Record<string, unknown> | null
+  last_seen: string | null
+}
+
+export interface Device {
+  ieee_address: string
+  friendly_name: string
+  type: string | null
+  model: string | null
+  vendor: string | null
+  description: string | null
+  supported: boolean
+  interview_completed: boolean
+  exposes: Z2mExpose[]
+  room_id: number | null
+  room_name: string | null
+  house_id: number | null
+  state: Record<string, unknown> | null
+  last_seen: string | null
+}
+
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(path, {
     ...options,
@@ -97,10 +140,27 @@ export const api = {
     delete: (id: number) => apiFetch(`/api/rooms/${id}`, { method: 'DELETE' }),
     history: (id: number, limit?: number): Promise<{ readings: SensorReading[] }> =>
       apiFetch(`/api/rooms/${id}/history?limit=${limit ?? 100}`),
+    devices: (id: number): Promise<{
+      in_room: RoomDevice[]
+      available: RoomDevice[]
+      can_edit: boolean
+    }> => apiFetch(`/api/rooms/${id}/devices`),
   },
   sensors: {
     latest: () => apiFetch('/api/sensors/latest'),
     post: (roomId: number, data: { temperature?: number; humidity?: number }) =>
       apiFetch(`/api/sensors/${roomId}`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  devices: {
+    list: (): Promise<{ bridge_online: boolean; devices: Device[] }> => apiFetch('/api/devices'),
+    get: (ieee: string): Promise<{ device: Device }> => apiFetch(`/api/devices/${encodeURIComponent(ieee)}`),
+    permitJoin: (value: boolean, time?: number): Promise<{ ok: true; value: boolean; time: number }> =>
+      apiFetch('/api/devices/permit-join', { method: 'POST', body: JSON.stringify({ value, time }) }),
+    set: (ieee: string, payload: Record<string, unknown>): Promise<{ ok: true; sent: Record<string, unknown> }> =>
+      apiFetch(`/api/devices/${encodeURIComponent(ieee)}/set`, { method: 'POST', body: JSON.stringify(payload) }),
+    update: (ieee: string, data: { room_id?: number | null; friendly_name?: string }) =>
+      apiFetch(`/api/devices/${encodeURIComponent(ieee)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    remove: (ieee: string, force = false) =>
+      apiFetch(`/api/devices/${encodeURIComponent(ieee)}?force=${force}`, { method: 'DELETE' }),
   },
 }

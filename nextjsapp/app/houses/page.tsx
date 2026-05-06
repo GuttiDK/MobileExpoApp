@@ -93,6 +93,9 @@ export default function HousesPage() {
             <p className="text-sm text-slate-400">{user?.name}</p>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => router.push('/devices')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+              📡 Enheder
+            </button>
             {user?.is_admin ? (
               <button onClick={() => router.push('/admin')} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
                 🔧 Admin

@@ -2,7 +2,8 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, SensorReading, Room } from '@/lib/apiClient'
+import { api, SensorReading, Room, RoomDevice } from '@/lib/apiClient'
+import { summarizeState } from '@/lib/deviceUtils'
 
 type Params = Promise<{ id: string; roomId: string }>
 
@@ -70,6 +71,50 @@ export default function RoomDetailPage({ params }: { params: Params }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const [roomDevices, setRoomDevices] = useState<RoomDevice[]>([])
+  const [availableDevices, setAvailableDevices] = useState<RoomDevice[]>([])
+  const [showAddDevice, setShowAddDevice] = useState(false)
+  const [deviceBusy, setDeviceBusy] = useState<string | null>(null)
+
+  async function loadDevices() {
+    try {
+      const data = await api.rooms.devices(rId)
+      setRoomDevices(data.in_room)
+      setAvailableDevices(data.available)
+    } catch {
+      // Ignore - devices section is optional
+    }
+  }
+
+  async function attachDevice(ieee: string) {
+    setDeviceBusy(ieee)
+    setError('')
+    try {
+      await api.devices.update(ieee, { room_id: rId })
+      await loadDevices()
+      setShowAddDevice(false)
+      flash('Enhed tilføjet')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fejl')
+    } finally {
+      setDeviceBusy(null)
+    }
+  }
+
+  async function detachDevice(ieee: string) {
+    setDeviceBusy(ieee)
+    setError('')
+    try {
+      await api.devices.update(ieee, { room_id: null })
+      await loadDevices()
+      flash('Enhed fjernet fra rum')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fejl')
+    } finally {
+      setDeviceBusy(null)
+    }
+  }
+
   async function load(showRefresh = false) {
     if (showRefresh) setRefreshing(true)
     try {
@@ -87,7 +132,7 @@ export default function RoomDetailPage({ params }: { params: Params }) {
     }
   }
 
-  useEffect(() => { load() }, [rId])
+  useEffect(() => { load(); loadDevices() }, [rId])
 
   function flash(msg: string) {
     setSuccess(msg)
@@ -242,6 +287,50 @@ export default function RoomDetailPage({ params }: { params: Params }) {
           )}
         </div>
 
+        {/* Devices in room */}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm text-slate-400 font-medium">Enheder ({roomDevices.length})</h2>
+            {canEdit && (
+              <button
+                onClick={() => { setShowAddDevice(true); setError('') }}
+                className="text-sm text-blue-400 hover:text-blue-300 border border-blue-700 bg-blue-900/20 px-3 py-1.5 rounded-lg"
+              >
+                + Tilføj
+              </button>
+            )}
+          </div>
+          {roomDevices.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-sm">
+              <p>Ingen enheder tilknyttet</p>
+              {canEdit && <p className="mt-1 text-xs">Tryk "Tilføj" for at vælge fra dine zigbee-enheder</p>}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {roomDevices.map((d) => (
+                <div key={d.ieee_address} className="flex items-center justify-between bg-slate-700/50 border border-slate-600 rounded-xl p-3">
+                  <button
+                    onClick={() => router.push(`/devices/${encodeURIComponent(d.ieee_address)}`)}
+                    className="flex-1 text-left min-w-0"
+                  >
+                    <p className="font-medium text-slate-100 truncate">{d.friendly_name}</p>
+                    <p className="text-xs text-slate-400 truncate">{summarizeState(d)}</p>
+                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => detachDevice(d.ieee_address)}
+                      disabled={deviceBusy === d.ieee_address}
+                      className="ml-3 text-xs text-slate-400 hover:text-red-400 disabled:opacity-50"
+                    >
+                      Fjern
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Stats */}
         {readings.length > 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
@@ -320,6 +409,40 @@ export default function RoomDetailPage({ params }: { params: Params }) {
             {error && <ErrorMsg msg={error} />}
             <SubmitBtn label="Gem ændringer" loading={submitting} />
           </form>
+        </Modal>
+      )}
+
+      {/* Add device modal */}
+      {showAddDevice && (
+        <Modal title="Tilføj enhed til rum" onClose={() => setShowAddDevice(false)}>
+          {availableDevices.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <div className="text-4xl mb-2">📭</div>
+              <p className="text-sm">Ingen tilgængelige enheder</p>
+              <button
+                onClick={() => router.push('/devices')}
+                className="mt-3 text-sm text-blue-400 hover:text-blue-300"
+              >
+                Gå til Enheder for at parre nye →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {availableDevices.map((d) => (
+                <button
+                  key={d.ieee_address}
+                  onClick={() => attachDevice(d.ieee_address)}
+                  disabled={deviceBusy === d.ieee_address}
+                  className="w-full text-left bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-xl p-3 disabled:opacity-50"
+                >
+                  <p className="font-medium text-slate-100 truncate">{d.friendly_name}</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {d.vendor ?? '?'} · {d.model ?? d.ieee_address}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
 

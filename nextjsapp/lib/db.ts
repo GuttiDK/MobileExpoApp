@@ -102,10 +102,30 @@ async function initSchema() {
       expires_at TIMESTAMPTZ NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS devices (
+      ieee_address TEXT PRIMARY KEY,
+      friendly_name TEXT NOT NULL,
+      type TEXT,
+      model TEXT,
+      vendor TEXT,
+      description TEXT,
+      supported BOOLEAN DEFAULT true,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      exposes JSONB,
+      last_seen TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS device_states (
+      ieee_address TEXT PRIMARY KEY REFERENCES devices(ieee_address) ON DELETE CASCADE,
+      state JSONB,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
     CREATE INDEX IF NOT EXISTS idx_sensor_room ON sensor_readings(room_id);
     CREATE INDEX IF NOT EXISTS idx_sensor_recorded ON sensor_readings(recorded_at);
     CREATE INDEX IF NOT EXISTS idx_members_user ON house_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_members_house ON house_members(house_id);
+    CREATE INDEX IF NOT EXISTS idx_devices_room ON devices(room_id);
+    CREATE INDEX IF NOT EXISTS idx_devices_friendly ON devices(friendly_name);
   `)
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false`)
 }
