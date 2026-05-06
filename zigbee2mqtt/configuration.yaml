@@ -7,8 +7,8 @@ mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://localhost:1883
   # Uncomment if your MQTT broker requires auth:
-  # user: username
-  # password: password
+  user: username
+  password: password
 
 serial:
   # nRF52840 enumerates as CDC-ACM — always /dev/ttyACM0 on Linux
